@@ -15,12 +15,32 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "Tune Music",
+    "copyright": "Tune Music",
+    "category": "Music",
+    "shortDescription": "Клиент Яндекс Музыки с темами и плагинами",
+    "longDescription": "Tune Music — клиент Яндекс Музыки для Windows с темами, плагинами, текстами песен, скачиванием треков и статусом в Discord.",
+    "homepage": "https://tune-music.github.io/tune/",
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/installer/header.bmp",
+        "sidebarImage": "icons/installer/sidebar.bmp",
+        "languages": [
+          "Russian"
+        ],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser"
+      }
+    }
   }
 }

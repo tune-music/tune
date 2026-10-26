@@ -8,6 +8,7 @@ mod discord;
 mod download;
 mod intercept;
 mod media;
+mod mixer;
 mod proxy;
 mod repo;
 mod store;
@@ -1160,6 +1161,7 @@ fn main() {
             }
             create_tray(handle)?;
             media::set_enabled(handle, media_keys);
+            mixer::spawn();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
