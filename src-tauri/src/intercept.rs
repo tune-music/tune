@@ -35,6 +35,12 @@ const JS_PATCHES: &[(&str, &str)] = &[
         "checkExperiment(t,a){let i=e.experiments[t],",
         "checkExperiment(t,a){let i=window.__tuneExp?window.__tuneExp(e.experiments,t):e.experiments[t],",
     ),
+    // Второй экран загрузки (MainSuspenseLoader) — блок без класса со звездой Яндекса.
+    // Класс нужен, чтобы SPLASH_CSS показал на нём ту же заставку Tune.
+    (
+        "zIndex:\"var(--ym-z-index-loader)\",alignItems:\"center\",justifyContent:\"center\",overflow:\"hidden\",background:\"var(--ym-background-color-primary-enabled-basic)\",...t};return(0,i.jsx)(\"div\",{style:a,children:",
+        "zIndex:\"var(--ym-z-index-loader)\",alignItems:\"center\",justifyContent:\"center\",overflow:\"hidden\",background:\"var(--ym-background-color-primary-enabled-basic)\",...t};return(0,i.jsx)(\"div\",{style:a,className:\"tune-main-loader\",children:",
+    ),
 ];
 
 fn patch_js(body: Vec<u8>) -> Vec<u8> {
@@ -47,19 +53,22 @@ fn patch_js(body: Vec<u8>) -> Vec<u8> {
     text.into_bytes()
 }
 
-/// Заставка загрузки Tune вместо видео Яндекса: тот же элемент интерфейса (он сам
-/// исчезает, когда музыка готова), но видео скрыто, а поверх — логотип и полоса загрузки.
+/// Заставка загрузки Tune вместо экранов Яндекса: видео первой заставки и звезда второго
+/// экрана (tune-main-loader) скрыты, поверх — логотип и полоса загрузки. Элементы те же,
+/// что у интерфейса, поэтому исчезают сами, когда музыка готова. На втором экране логотип
+/// не анимируется заново — две заставки выглядят как одна.
 /// Здесь же скрыта кнопка «Что нового» с версией клиента: клиент обновляется вместе с Tune.
 const SPLASH_CSS: &str = r#"
-[class*="SplashScreen_video"]{opacity:0!important}
+[class*="SplashScreen_video"],.tune-main-loader>*{opacity:0!important}
 [data-test-id="RELEASE_NOTES_BUTTON"]{display:none!important}
-[class*="SplashScreen_root"]{background:#09090b!important}
-[class*="SplashScreen_root_light"]{background:#f4f4f5!important}
-[class*="SplashScreen_root"]::before{content:"";position:absolute;left:50%;top:50%;width:260px;height:150px;transform:translate(-50%,-62%);
+[class*="SplashScreen_root"],.tune-main-loader{background:var(--ym-background-color-primary-enabled-basic,#000)!important}
+[class*="SplashScreen_root_light"]{background:#fff!important}
+[class*="SplashScreen_root"]::before,.tune-main-loader::before{content:"";position:absolute;left:50%;top:50%;width:260px;height:150px;transform:translate(-50%,-62%);
 background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 150'%3E%3Cg transform='translate(98 6) scale(2.6)' fill='none' stroke='%23facc15' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6'/%3E%3C/g%3E%3Ctext x='130' y='132' text-anchor='middle' font-family='Segoe UI Variable Display,Segoe UI,sans-serif' font-size='30' font-weight='600' fill='%23fafafa' letter-spacing='.5'%3ETune Music%3C/text%3E%3C/svg%3E");
 animation:tune-splash-in .5s ease-out both}
-[class*="SplashScreen_root_light"]::before{filter:invert(1) hue-rotate(180deg)}
-[class*="SplashScreen_root"]::after{content:"";position:absolute;left:50%;top:50%;width:180px;height:3px;margin:72px 0 0 -90px;border-radius:2px;
+.tune-main-loader::before{animation:none}
+[class*="SplashScreen_root_light"]::before,.ym-light-theme .tune-main-loader::before{filter:invert(1) hue-rotate(180deg)}
+[class*="SplashScreen_root"]::after,.tune-main-loader::after{content:"";position:absolute;left:50%;top:50%;width:180px;height:3px;margin:72px 0 0 -90px;border-radius:2px;
 background:rgba(127,127,127,.22) linear-gradient(90deg,transparent,#facc15,transparent) no-repeat;background-size:40% 100%;
 animation:tune-splash-bar 1.1s ease-in-out infinite}
 @keyframes tune-splash-bar{from{background-position:-80% 0}to{background-position:180% 0}}
