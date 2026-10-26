@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-download"
+description = "Enables the page_download command without any pre-configured scope."
+commands.allow = ["page_download"]
+
+[[permission]]
+identifier = "deny-page-download"
+description = "Denies the page_download command without any pre-configured scope."
+commands.deny = ["page_download"]

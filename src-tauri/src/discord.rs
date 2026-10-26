@@ -7,7 +7,7 @@
 //! Регистрировать своё приложение не нужно: название активности задаётся полем `name`,
 //! картинки — прямыми ссылками, поэтому подходит любое приложение Discord.
 
-use crate::store::{DiscordButton, DiscordSettings};
+use crate::store::DiscordSettings;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use serde::Deserialize;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
@@ -17,6 +17,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// Приложение Discord по умолчанию. Его собственное название не видно: Tune
 /// подменяет его своим (`name`), поэтому выбор приложения ни на что не влияет.
 const DEFAULT_APP_ID: &str = "1300258490815741952";
+/// Сайт Tune: сюда по умолчанию ведёт значок в углу обложки.
+pub const TUNE_SITE: &str = "https://tune-music.github.io/tune/";
 /// Значок Tune из репозитория github.com/tune-music/tune (Discord берёт картинки только по ссылке).
 const TUNE_ICON: &str = "https://raw.githubusercontent.com/tune-music/tune/main/src-tauri/icons/128x128@2x.png";
 
@@ -131,46 +133,47 @@ fn disconnect(client: &mut Option<DiscordIpcClient>) {
     }
 }
 
-/// Discord требует от 2 до 128 символов в текстовых полях.
+/// Первые `max` байт UTF-8 строки, не разрезая символ.
+fn clip_bytes(s: &str, max: usize) -> String {
+    let mut end = 0;
+    for (i, c) in s.char_indices() {
+        if i + c.len_utf8() > max {
+            break;
+        }
+        end = i + c.len_utf8();
+    }
+    s[..end].trim_end().to_string()
+}
+
+/// Discord считает длину текстовых полей в байтах UTF-8: от 2 до 128. Русская буква —
+/// два байта, поэтому обрезаем по байтам, иначе Discord отбрасывает поле.
 fn fit(s: &str) -> String {
-    let mut s: String = s.chars().take(128).collect();
+    let mut s = clip_bytes(s, 128);
     while s.chars().count() < 2 {
         s.push(' ');
     }
     s
 }
 
-fn link(t: &Track, target: &str) -> Option<String> {
-    let url = match target {
-        "track" => &t.url,
-        "album" => &t.album_url,
-        "artist" => &t.artist_url,
-        _ => return None,
-    };
-    url.starts_with("https://").then(|| url.clone())
+fn web_url(u: &str) -> Option<String> {
+    let u = u.trim();
+    (u.starts_with("https://") || u.starts_with("http://")).then(|| u.to_string())
 }
 
-fn button(t: &Track, b: &DiscordButton) -> Option<activity::Button<'static>> {
-    let url = match b.target.as_str() {
-        "custom" => Some(b.url.trim().to_string()).filter(|u| u.starts_with("https://") || u.starts_with("http://")),
-        other => link(t, other),
-    }?;
-    let label = if b.label.trim().is_empty() {
-        match b.target.as_str() {
-            "album" => "Альбом",
-            "artist" => "Исполнитель",
-            "custom" => "Ссылка",
-            _ => "Слушать в Яндекс Музыке",
-        }
-        .to_string()
-    } else {
-        b.label.trim().chars().take(32).collect()
-    };
-    Some(activity::Button::new(label, url))
+/// Куда ведёт клик: страница трека, альбома, исполнителя или своя ссылка.
+fn link(t: &Track, target: &str, custom: &str) -> Option<String> {
+    match target {
+        "track" => web_url(&t.url),
+        "album" => web_url(&t.album_url),
+        "artist" => web_url(&t.artist_url),
+        "tune" => Some(TUNE_SITE.to_string()),
+        "custom" => web_url(custom),
+        _ => None,
+    }
 }
 
 fn build_activity(t: &Track, cfg: &DiscordSettings) -> activity::Activity<'static> {
-    let name = if cfg.name.trim().is_empty() { "Яндекс Музыка" } else { cfg.name.trim() };
+    let name = if cfg.name.trim().is_empty() { "Tune Music" } else { cfg.name.trim() };
     let details = fit(&t.title);
     let state = fit(if t.artist.is_empty() { name } else { &t.artist });
     let album = fit(if t.album.is_empty() { &t.title } else { &t.album });
@@ -185,10 +188,16 @@ fn build_activity(t: &Track, cfg: &DiscordSettings) -> activity::Activity<'stati
     } else {
         assets = assets.large_image(icon.clone());
     }
+    if let Some(u) = link(t, &cfg.cover_link, &cfg.cover_url) {
+        assets = assets.large_url(u);
+    }
     if cfg.small_icon {
         assets = assets
             .small_image(icon)
             .small_text(if t.playing { "Играет" } else { "Пауза" }.to_string());
+        if let Some(u) = link(t, &cfg.icon_link, &cfg.icon_link_url) {
+            assets = assets.small_url(u);
+        }
     }
 
     let display = match cfg.status_display.as_str() {
@@ -203,10 +212,10 @@ fn build_activity(t: &Track, cfg: &DiscordSettings) -> activity::Activity<'stati
         .details(details)
         .state(if t.playing { state } else { fit(&format!("Пауза · {}", t.artist)) })
         .assets(assets);
-    if let Some(u) = link(t, &cfg.title_link) {
+    if let Some(u) = link(t, &cfg.title_link, &cfg.title_url) {
         act = act.details_url(u);
     }
-    if let Some(u) = link(t, &cfg.artist_link) {
+    if let Some(u) = link(t, &cfg.artist_link, &cfg.artist_url) {
         act = act.state_url(u);
     }
 
@@ -217,9 +226,44 @@ fn build_activity(t: &Track, cfg: &DiscordSettings) -> activity::Activity<'stati
         act = act.timestamps(activity::Timestamps::new().start(start).end(end));
     }
 
-    let buttons: Vec<_> = [&cfg.button1, &cfg.button2].into_iter().filter_map(|b| button(t, b)).collect();
-    if !buttons.is_empty() {
-        act = act.buttons(buttons);
-    }
     act
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn track() -> Track {
+        Track {
+            title: "Клей".into(),
+            artist: "CUPSIZE".into(),
+            cover: "https://avatars.yandex.net/x/400x400".into(),
+            url: "https://music.yandex.ru/album/1/track/2".into(),
+            album_url: "https://music.yandex.ru/album/1".into(),
+            artist_url: "https://music.yandex.ru/artist/3".into(),
+            playing: true,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn links() {
+        let mut cfg = DiscordSettings::default();
+        cfg.cover_link = "custom".into();
+        cfg.cover_url = " https://example.com/cover ".into();
+        let json = serde_json::to_value(build_activity(&track(), &cfg)).unwrap();
+        assert_eq!(json["details_url"], "https://music.yandex.ru/album/1/track/2");
+        assert_eq!(json["assets"]["large_url"], "https://example.com/cover");
+        assert!(json.get("buttons").is_none());
+        // По умолчанию обложка ведёт на трек, значок — никуда.
+        let json = serde_json::to_value(build_activity(&track(), &DiscordSettings::default())).unwrap();
+        assert_eq!(json["assets"]["large_url"], "https://music.yandex.ru/album/1/track/2");
+        assert_eq!(json["assets"]["small_url"], TUNE_SITE);
+    }
+
+    #[test]
+    fn texts_fit_in_bytes() {
+        assert_eq!(clip_bytes("Слушать в Яндекс Музыке", 32), "Слушать в Яндекс");
+        assert!(fit(&"ё".repeat(100)).len() <= 128);
+    }
 }

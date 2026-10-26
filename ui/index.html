@@ -87,199 +87,270 @@
 
       <!-- Настройки -->
       <section class="view hidden" id="view-settings">
-        <header class="view-header"><h1>Настройки</h1></header>
+        <header class="view-header">
+          <div class="tabs" role="tablist" id="settings-tabs">
+            <button class="tab active" data-section="player" role="tab">Плеер</button>
+            <button class="tab" data-section="discord" role="tab">Discord</button>
+            <button class="tab" data-section="window" role="tab">Окно</button>
+            <button class="tab" data-section="system" role="tab">Система</button>
+            <button class="tab" data-section="about" role="tab">О программе</button>
+          </div>
+        </header>
         <div class="settings" id="settings-form">
 
-          <h2>Discord</h2>
-          <div class="card">
-            <label class="row">
-              <div class="row-text">
-                <div class="row-title">Показывать трек в статусе</div>
-                <div class="row-desc">Работает сразу, если Discord запущен на этом компьютере — регистрировать ничего не нужно.</div>
-              </div>
-              <input type="checkbox" class="switch" data-key="discord.enabled" />
-            </label>
-            <div class="row" data-dep="discord.enabled">
-              <div class="row-text">
-                <div class="row-title">Название активности</div>
-                <div class="row-desc">Discord покажет «Слушает …».</div>
-              </div>
-              <input type="text" class="input" data-key="discord.name" maxlength="64" placeholder="Яндекс Музыка" spellcheck="false" />
-            </div>
-            <div class="row" data-dep="discord.enabled">
-              <div class="row-text">
-                <div class="row-title">Подпись в списке участников</div>
-                <div class="row-desc">Что видно рядом с ником, без открытия профиля.</div>
-              </div>
-              <select class="input" data-key="discord.statusDisplay">
-                <option value="name">Слушает «название активности»</option>
-                <option value="details">Слушает «название трека»</option>
-                <option value="state">Слушает «исполнитель»</option>
-              </select>
-            </div>
-            <div class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Клик по названию трека</div></div>
-              <select class="input" data-key="discord.titleLink">
-                <option value="track">Открывает трек</option>
-                <option value="album">Открывает альбом</option>
-                <option value="none">Ничего не делает</option>
-              </select>
-            </div>
-            <div class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Клик по исполнителю</div></div>
-              <select class="input" data-key="discord.artistLink">
-                <option value="artist">Открывает исполнителя</option>
-                <option value="album">Открывает альбом</option>
-                <option value="none">Ничего не делает</option>
-              </select>
-            </div>
-            <div class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Первая кнопка</div></div>
-              <div class="row-controls">
-                <select class="input" data-key="discord.button1.target">
-                  <option value="none">Нет</option><option value="track">Трек</option><option value="album">Альбом</option><option value="artist">Исполнитель</option><option value="custom">Своя ссылка</option>
-                </select>
-                <input type="text" class="input" data-key="discord.button1.label" maxlength="32" placeholder="Подпись" spellcheck="false" />
-              </div>
-            </div>
-            <div class="row hidden" data-custom="discord.button1">
-              <div class="row-text"><div class="row-title">Ссылка первой кнопки</div></div>
-              <input type="url" class="input wide" data-key="discord.button1.url" placeholder="https://…" spellcheck="false" />
-            </div>
-            <div class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Вторая кнопка</div></div>
-              <div class="row-controls">
-                <select class="input" data-key="discord.button2.target">
-                  <option value="none">Нет</option><option value="track">Трек</option><option value="album">Альбом</option><option value="artist">Исполнитель</option><option value="custom">Своя ссылка</option>
-                </select>
-                <input type="text" class="input" data-key="discord.button2.label" maxlength="32" placeholder="Подпись" spellcheck="false" />
-              </div>
-            </div>
-            <div class="row hidden" data-custom="discord.button2">
-              <div class="row-text"><div class="row-title">Ссылка второй кнопки</div></div>
-              <input type="url" class="input wide" data-key="discord.button2.url" placeholder="https://…" spellcheck="false" />
-            </div>
-            <label class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Обложка трека</div></div>
-              <input type="checkbox" class="switch" data-key="discord.showCover" />
-            </label>
-            <label class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Полоса времени</div><div class="row-desc">Сколько прошло и сколько осталось.</div></div>
-              <input type="checkbox" class="switch" data-key="discord.showProgress" />
-            </label>
-            <label class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Значок на обложке</div><div class="row-desc">Маленький значок в углу обложки, при наведении — «Играет» или «Пауза».</div></div>
-              <input type="checkbox" class="switch" data-key="discord.smallIcon" />
-            </label>
-            <div class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Картинка значка</div><div class="row-desc">Ссылка на картинку в интернете (https://…). Пусто — значок Tune.</div></div>
-              <input type="url" class="input wide" data-key="discord.iconUrl" placeholder="Значок Tune" spellcheck="false" />
-            </div>
-            <label class="row" data-dep="discord.enabled">
-              <div class="row-text"><div class="row-title">Оставлять статус на паузе</div><div class="row-desc">Иначе статус пропадает, пока музыка на паузе.</div></div>
-              <input type="checkbox" class="switch" data-key="discord.showPaused" />
-            </label>
-            <details class="row-details" data-dep="discord.enabled">
-              <summary>Дополнительно</summary>
+          <!-- Плеер -->
+          <div class="settings-section" data-section="player">
+            <h2>Текст песен</h2>
+            <div class="card">
               <div class="row">
+                <div class="row-text">
+                  <div class="row-title">Синхронный текст песен</div>
+                  <div class="row-desc">Если у Яндекса текста нет, Tune находит его сам — кнопка «Текст» в плеере снова работает. Строки подсвечиваются по ходу песни, клик по строке перематывает.</div>
+                </div>
+                <input type="checkbox" class="switch" data-key="features.lyrics" />
+              </div>
+              <div class="row" data-dep="features.lyrics">
+                <div class="row-text"><div class="row-title">Искать и там, где у Яндекса есть свой текст</div></div>
+                <input type="checkbox" class="switch" data-key="features.lyricsAlways" />
+              </div>
+              <div class="row" data-dep="features.lyrics">
+                <div class="row-text"><div class="row-title">Размер текста</div></div>
+                <div class="row-controls">
+                  <input type="range" min="16" max="34" step="1" data-key="features.lyricsFontSize" />
+                  <span class="range-value" data-value-of="features.lyricsFontSize" data-unit="px"></span>
+                </div>
+              </div>
+            </div>
+
+            <h2>Управление</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Громкость колесом мыши</div><div class="row-desc">Над панелью плеера.</div></div>
+                <input type="checkbox" class="switch" data-key="features.wheelVolume" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Шаг громкости</div><div class="row-desc">Для колеса мыши и <kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd>.</div></div>
+                <select class="input" data-key="features.volumeStep" data-type="number">
+                  <option value="1">1 %</option><option value="2">2 %</option><option value="5">5 %</option><option value="10">10 %</option>
+                </select>
+              </div>
+              <div class="row">
+                <div class="row-text">
+                  <div class="row-title">Горячие клавиши</div>
+                  <div class="row-desc"><kbd>Пробел</kbd> пауза · <kbd>Ctrl</kbd>+<kbd>←</kbd>/<kbd>→</kbd> трек · <kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> громкость · <kbd>Ctrl</kbd>+<kbd>L</kbd> текст</div>
+                </div>
+                <input type="checkbox" class="switch" data-key="features.hotkeys" />
+              </div>
+            </div>
+
+            <h2>Скорость и эффекты</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Кнопка скорости</div><div class="row-desc">У громкости, от 0,5× до 2×: клик — быстрее, Shift+клик — медленнее, колесо над кнопкой — по шагу, правый клик — обычная скорость.</div></div>
+                <input type="checkbox" class="switch" data-key="features.speedControl" />
+              </div>
+              <div class="row" data-dep="features.speedControl">
+                <div class="row-text"><div class="row-title">Шаг скорости</div></div>
+                <select class="input" data-key="features.speedStep" data-type="number">
+                  <option value="0.05">0,05×</option><option value="0.1">0,1×</option><option value="0.25">0,25×</option>
+                </select>
+              </div>
+              <div class="row" data-dep="features.speedControl">
+                <div class="row-text"><div class="row-title">Тон вместе со скоростью</div><div class="row-desc">Быстрее — выше, как в найткоре; медленнее — ниже, как в слоуде. Иначе голос звучит своим тоном на любой скорости.</div></div>
+                <input type="checkbox" class="switch" data-key="features.pitchWithSpeed" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Реверб</div><div class="row-desc">Эхо большого зала поверх трека — с замедлением получается slowed + reverb. 0 — выключен.</div></div>
+                <div class="row-controls">
+                  <input type="range" min="0" max="100" step="5" data-key="features.reverb" />
+                  <span class="range-value" data-value-of="features.reverb" data-unit="%"></span>
+                </div>
+              </div>
+            </div>
+
+            <h2>Треки</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Без цензуры</div><div class="row-desc">Треки, у которых в Яндексе запикана или вырезана часть, играют в оригинальной версии — по открытому списку <a href="#" data-link="https://github.com/Hazzz895/FckCensorData">FckCensor</a>, он обновляется сам. У таких треков стоит значок замка.</div></div>
+                <input type="checkbox" class="switch" data-key="features.uncensor" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Скачивание треков</div><div class="row-desc">Пункт «Скачать файл» в меню «…» плеера сохраняет играющий трек в «Загрузки» в том качестве, в котором он играет.</div></div>
+                <input type="checkbox" class="switch" data-key="features.download" />
+              </div>
+              <div class="row" data-dep="features.download">
+                <div class="row-text"><div class="row-title">Кнопка скачивания в панели плеера</div><div class="row-desc">Рядом с громкостью. В новом плеере место тесное — без неё шире блок с треком.</div></div>
+                <input type="checkbox" class="switch" data-key="features.downloadButton" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Discord -->
+          <div class="settings-section hidden" data-section="discord">
+            <h2>Статус</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text">
+                  <div class="row-title">Показывать трек в статусе Discord</div>
+                  <div class="row-desc">Работает сразу, если Discord запущен на этом компьютере — регистрировать ничего не нужно.</div>
+                </div>
+                <input type="checkbox" class="switch" data-key="discord.enabled" />
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Название активности</div><div class="row-desc">Discord покажет «Слушает …».</div></div>
+                <input type="text" class="input" data-key="discord.name" maxlength="64" placeholder="Tune Music" spellcheck="false" />
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Подпись в списке участников</div><div class="row-desc">Что видно рядом с ником, без открытия профиля.</div></div>
+                <select class="input" data-key="discord.statusDisplay">
+                  <option value="name">Слушает «название активности»</option>
+                  <option value="details">Слушает «название трека»</option>
+                  <option value="state">Слушает «исполнитель»</option>
+                </select>
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Полоса времени</div><div class="row-desc">Сколько прошло и сколько осталось.</div></div>
+                <input type="checkbox" class="switch" data-key="discord.showProgress" />
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Оставлять статус на паузе</div><div class="row-desc">Иначе статус пропадает, пока музыка на паузе.</div></div>
+                <input type="checkbox" class="switch" data-key="discord.showPaused" />
+              </div>
+            </div>
+
+            <h2>Картинки</h2>
+            <div class="card">
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Обложка трека</div><div class="row-desc">Иначе вместо обложки — значок.</div></div>
+                <input type="checkbox" class="switch" data-key="discord.showCover" />
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Значок на обложке</div><div class="row-desc">Маленький значок в углу обложки, при наведении — «Играет» или «Пауза».</div></div>
+                <input type="checkbox" class="switch" data-key="discord.smallIcon" />
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Картинка значка</div><div class="row-desc">Ссылка на картинку в интернете (https://…). Пусто — значок Tune.</div></div>
+                <input type="url" class="input wide" data-key="discord.iconUrl" placeholder="Значок Tune" spellcheck="false" />
+              </div>
+            </div>
+
+            <h2>Ссылки при клике</h2>
+            <div class="card">
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Название трека</div></div>
+                <select class="input" data-key="discord.titleLink" data-link-select></select>
+              </div>
+              <div class="row hidden" data-custom="discord.titleLink">
+                <div class="row-text"><div class="row-title">Своя ссылка для названия</div></div>
+                <input type="url" class="input wide" data-key="discord.titleUrl" placeholder="https://…" spellcheck="false" />
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Исполнитель</div></div>
+                <select class="input" data-key="discord.artistLink" data-link-select></select>
+              </div>
+              <div class="row hidden" data-custom="discord.artistLink">
+                <div class="row-text"><div class="row-title">Своя ссылка для исполнителя</div></div>
+                <input type="url" class="input wide" data-key="discord.artistUrl" placeholder="https://…" spellcheck="false" />
+              </div>
+              <div class="row" data-dep="discord.enabled">
+                <div class="row-text"><div class="row-title">Обложка и альбом</div><div class="row-desc">Discord открывает одну ссылку и по обложке, и по строке с названием альбома под исполнителем.</div></div>
+                <select class="input" data-key="discord.coverLink" data-link-select></select>
+              </div>
+              <div class="row hidden" data-custom="discord.coverLink">
+                <div class="row-text"><div class="row-title">Своя ссылка для обложки и альбома</div></div>
+                <input type="url" class="input wide" data-key="discord.coverUrl" placeholder="https://…" spellcheck="false" />
+              </div>
+              <div class="row" data-dep="discord.enabled discord.smallIcon">
+                <div class="row-text"><div class="row-title">Значок на обложке</div></div>
+                <select class="input" data-key="discord.iconLink" data-link-select></select>
+              </div>
+              <div class="row hidden" data-custom="discord.iconLink">
+                <div class="row-text"><div class="row-title">Своя ссылка для значка</div></div>
+                <input type="url" class="input wide" data-key="discord.iconLinkUrl" placeholder="https://…" spellcheck="false" />
+              </div>
+            </div>
+
+            <h2>Дополнительно</h2>
+            <div class="card">
+              <div class="row" data-dep="discord.enabled">
                 <div class="row-text">
                   <div class="row-title">Своё приложение Discord (ID)</div>
                   <div class="row-desc">Обычно не нужно. Пригодится, если хотите показывать в профиле значок своего приложения Discord.</div>
                 </div>
                 <input type="text" class="input" data-key="discord.appId" placeholder="Не указано" inputmode="numeric" spellcheck="false" />
               </div>
-            </details>
-          </div>
-
-          <h2>Улучшения</h2>
-          <div class="card">
-            <label class="row">
-              <div class="row-text">
-                <div class="row-title">Синхронный текст песен</div>
-                <div class="row-desc">Если у Яндекса текста нет, Tune находит его сам — кнопка «Текст» в плеере снова работает. Строки подсвечиваются по ходу песни, клик по строке перематывает.</div>
-              </div>
-              <input type="checkbox" class="switch" data-key="features.lyrics" />
-            </label>
-            <label class="row" data-dep="features.lyrics">
-              <div class="row-text"><div class="row-title">Искать и там, где у Яндекса есть свой текст</div></div>
-              <input type="checkbox" class="switch" data-key="features.lyricsAlways" />
-            </label>
-            <div class="row" data-dep="features.lyrics">
-              <div class="row-text"><div class="row-title">Размер текста</div></div>
-              <div class="row-controls">
-                <input type="range" min="16" max="34" step="1" data-key="features.lyricsFontSize" />
-                <span class="range-value" data-value-of="features.lyricsFontSize"></span>
-              </div>
-            </div>
-            <label class="row">
-              <div class="row-text"><div class="row-title">Громкость колесом мыши</div><div class="row-desc">Над панелью плеера.</div></div>
-              <input type="checkbox" class="switch" data-key="features.wheelVolume" />
-            </label>
-            <label class="row">
-              <div class="row-text"><div class="row-title">Скорость воспроизведения</div><div class="row-desc">Кнопка у громкости: 0,5× – 2×, Shift+клик — назад. Удобно для подкастов и аудиокниг.</div></div>
-              <input type="checkbox" class="switch" data-key="features.speedControl" />
-            </label>
-            <label class="row">
-              <div class="row-text"><div class="row-title">Трек в заголовке окна</div><div class="row-desc">«Исполнитель — трек» на панели задач и в Alt+Tab.</div></div>
-              <input type="checkbox" class="switch" data-key="features.windowTitle" />
-            </label>
-            <label class="row">
-              <div class="row-text">
-                <div class="row-title">Горячие клавиши</div>
-                <div class="row-desc"><kbd>Пробел</kbd> пауза · <kbd>Ctrl</kbd>+<kbd>←</kbd>/<kbd>→</kbd> трек · <kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> громкость · <kbd>Ctrl</kbd>+<kbd>L</kbd> текст</div>
-              </div>
-              <input type="checkbox" class="switch" data-key="features.hotkeys" />
-            </label>
-            <label class="row">
-              <div class="row-text"><div class="row-title">Не выделять текст интерфейса мышью</div><div class="row-desc">Как в обычном приложении. Поля ввода работают как прежде.</div></div>
-              <input type="checkbox" class="switch" data-key="features.noSelect" />
-            </label>
-          </div>
-
-          <h2>Окно и запуск</h2>
-          <div class="card">
-            <label class="row">
-              <div class="row-text"><div class="row-title">Запускать вместе с Windows</div><div class="row-desc">Tune стартует свёрнутым в трей.</div></div>
-              <input type="checkbox" class="switch" data-key="autostart" />
-            </label>
-            <label class="row">
-              <div class="row-text"><div class="row-title">Запускать свёрнутым</div><div class="row-desc">Окно музыки не появится при обычном запуске — откройте его из трея.</div></div>
-              <input type="checkbox" class="switch" data-key="startMinimized" />
-            </label>
-            <label class="row">
-              <div class="row-text"><div class="row-title">Сворачивать в трей при закрытии</div><div class="row-desc">Музыка продолжит играть. Выйти совсем — из меню значка в трее.</div></div>
-              <input type="checkbox" class="switch" data-key="closeToTray" />
-            </label>
-            <div class="row">
-              <div class="row-text"><div class="row-title">Масштаб интерфейса</div></div>
-              <select class="input" data-key="zoom" data-type="number">
-                <option value="0.8">80 %</option><option value="0.9">90 %</option><option value="1">100 %</option><option value="1.1">110 %</option>
-                <option value="1.25">125 %</option><option value="1.5">150 %</option>
-              </select>
             </div>
           </div>
 
-          <h2>Система</h2>
-          <div class="card">
-            <label class="row">
-              <div class="row-text"><div class="row-title">Медиаклавиши и панель Windows</div><div class="row-desc">Трек и кнопки в панели громкости Windows; клавиши работают и при свёрнутом окне.</div></div>
-              <input type="checkbox" class="switch" data-key="mediaKeys" />
-            </label>
-            <label class="row">
-              <div class="row-text"><div class="row-title">Весь трафик через процесс Tune</div><div class="row-desc">Удобно, если VPN настроен только для отдельных программ: достаточно добавить Tune. Применяется после перезапуска.</div></div>
-              <input type="checkbox" class="switch" data-key="routeThroughTune" />
-            </label>
+          <!-- Окно -->
+          <div class="settings-section hidden" data-section="window">
+            <h2>Запуск</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Запускать вместе с Windows</div><div class="row-desc">Tune стартует свёрнутым в трей.</div></div>
+                <input type="checkbox" class="switch" data-key="autostart" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Запускать свёрнутым</div><div class="row-desc">Окно музыки не появится при обычном запуске — откройте его из трея.</div></div>
+                <input type="checkbox" class="switch" data-key="startMinimized" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Сворачивать в трей при закрытии</div><div class="row-desc">Музыка продолжит играть. Выйти совсем — из меню значка в трее.</div></div>
+                <input type="checkbox" class="switch" data-key="closeToTray" />
+              </div>
+            </div>
+
+            <h2>Вид</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Масштаб интерфейса</div></div>
+                <select class="input" data-key="zoom" data-type="number">
+                  <option value="0.8">80 %</option><option value="0.9">90 %</option><option value="1">100 %</option><option value="1.1">110 %</option>
+                  <option value="1.25">125 %</option><option value="1.5">150 %</option>
+                </select>
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Трек в заголовке окна</div><div class="row-desc">«Исполнитель — трек» на панели задач и в Alt+Tab.</div></div>
+                <input type="checkbox" class="switch" data-key="features.windowTitle" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Не выделять текст интерфейса мышью</div><div class="row-desc">Как в обычном приложении. Поля ввода работают как прежде.</div></div>
+                <input type="checkbox" class="switch" data-key="features.noSelect" />
+              </div>
+            </div>
           </div>
 
-          <h2>О программе</h2>
-          <div class="card">
-            <div class="row">
-              <div class="row-text"><div class="row-title" id="about-version"></div><div class="row-desc" id="about-client"></div></div>
-              <button class="btn btn-ghost" id="reload-client">Перезагрузить страницу музыки</button>
+          <!-- Система -->
+          <div class="settings-section hidden" data-section="system">
+            <h2>Windows</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Медиаклавиши и панель Windows</div><div class="row-desc">Трек и кнопки в панели громкости Windows; клавиши работают и при свёрнутом окне.</div></div>
+                <input type="checkbox" class="switch" data-key="mediaKeys" />
+              </div>
             </div>
-            <div class="row">
-              <div class="row-text"><div class="row-title">Папка данных</div><div class="row-desc" id="about-data"></div></div>
-              <button class="btn btn-ghost" id="open-data">Открыть</button>
+
+            <h2>Сеть</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Весь трафик через процесс Tune</div><div class="row-desc">Удобно, если VPN настроен только для отдельных программ: достаточно добавить Tune. Применяется после перезапуска.</div></div>
+                <input type="checkbox" class="switch" data-key="routeThroughTune" />
+              </div>
+            </div>
+          </div>
+
+          <!-- О программе -->
+          <div class="settings-section hidden" data-section="about">
+            <h2>Tune Music</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title" id="about-version"></div><div class="row-desc" id="about-client"></div></div>
+                <button class="btn btn-ghost" id="reload-client">Перезагрузить страницу музыки</button>
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Папка данных</div><div class="row-desc" id="about-data"></div></div>
+                <button class="btn btn-ghost" id="open-data">Открыть</button>
+              </div>
             </div>
           </div>
         </div>

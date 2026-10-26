@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Значок организации tune-music: значок приложения на весь квадрат, GitHub скругляет углы сам. -->
+  <rect width="512" height="512" fill="#18181b"/>
+  <g transform="translate(256 256) scale(0.82) translate(-256 -256)">
+    <g stroke="#facc15" stroke-width="36" stroke-linecap="round">
+      <line x1="136" y1="400" x2="136" y2="290"/><line x1="136" y1="200" x2="136" y2="112"/>
+      <line x1="256" y1="400" x2="256" y2="250"/><line x1="256" y1="160" x2="256" y2="112"/>
+      <line x1="376" y1="400" x2="376" y2="330"/><line x1="376" y1="240" x2="376" y2="112"/>
+    </g>
+    <g stroke="#fafafa" stroke-width="36" stroke-linecap="round">
+      <line x1="86" y1="245" x2="186" y2="245"/><line x1="206" y1="205" x2="306" y2="205"/><line x1="326" y1="285" x2="426" y2="285"/>
+    </g>
+  </g>
+</svg>

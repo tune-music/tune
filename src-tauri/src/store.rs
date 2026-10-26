@@ -5,22 +5,6 @@ use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Кнопка в статусе Discord.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct DiscordButton {
-    /// "none" | "track" | "album" | "artist" | "custom"
-    pub target: String,
-    pub label: String,
-    pub url: String,
-}
-
-impl Default for DiscordButton {
-    fn default() -> Self {
-        Self { target: "none".into(), label: String::new(), url: String::new() }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct DiscordSettings {
@@ -29,9 +13,16 @@ pub struct DiscordSettings {
     pub name: String,
     /// Что показывать в списке участников: "name" | "details" (трек) | "state" (исполнитель).
     pub status_display: String,
-    /// Куда ведёт клик по названию трека и по исполнителю: "track" | "album" | "artist" | "none".
+    /// Куда ведёт клик по названию, исполнителю, обложке и значку:
+    /// "track" | "album" | "artist" | "custom" | "none". Для "custom" — ссылка из *_url.
     pub title_link: String,
+    pub title_url: String,
     pub artist_link: String,
+    pub artist_url: String,
+    pub cover_link: String,
+    pub cover_url: String,
+    pub icon_link: String,
+    pub icon_link_url: String,
     pub show_cover: bool,
     pub show_progress: bool,
     /// На паузе: true — показывать «Пауза», false — убирать статус.
@@ -39,8 +30,6 @@ pub struct DiscordSettings {
     pub small_icon: bool,
     /// Своя картинка для значка (ссылка https). Пусто — значок Tune.
     pub icon_url: String,
-    pub button1: DiscordButton,
-    pub button2: DiscordButton,
     /// Своё приложение Discord (необязательно). Пусто — встроенное.
     pub app_id: String,
 }
@@ -49,17 +38,21 @@ impl Default for DiscordSettings {
     fn default() -> Self {
         Self {
             enabled: true,
-            name: "Яндекс Музыка".into(),
-            status_display: "details".into(),
+            name: "Tune Music".into(),
+            status_display: "name".into(),
             title_link: "track".into(),
+            title_url: String::new(),
             artist_link: "artist".into(),
+            artist_url: String::new(),
+            cover_link: "track".into(),
+            cover_url: String::new(),
+            icon_link: "tune".into(),
+            icon_link_url: String::new(),
             show_cover: true,
             show_progress: true,
             show_paused: false,
             small_icon: true,
             icon_url: String::new(),
-            button1: DiscordButton { target: "track".into(), label: "Слушать в Яндекс Музыке".into(), url: String::new() },
-            button2: DiscordButton::default(),
             app_id: String::new(),
         }
     }
@@ -78,12 +71,26 @@ pub struct Features {
     pub wheel_volume: bool,
     /// Кнопка скорости воспроизведения в плеере.
     pub speed_control: bool,
+    /// Шаг кнопки скорости: 0,05 / 0,1 / 0,25.
+    pub speed_step: f64,
+    /// Тон меняется вместе со скоростью — найткор (быстрее и выше) и слоуд (медленнее и ниже).
+    pub pitch_with_speed: bool,
+    /// Реверб, 0–100 %: доля «зала» в звуке. 0 — выключен.
+    pub reverb: u32,
+    /// Шаг громкости колесом и Ctrl+↑/↓, в процентах.
+    pub volume_step: u32,
     /// «Исполнитель — трек» в заголовке окна и на панели задач.
     pub window_title: bool,
     /// Пробел, стрелки и т.п. в окне музыки.
     pub hotkeys: bool,
     /// Не выделять текст интерфейса мышью, как в нативном приложении.
     pub no_select: bool,
+    /// Скачивание файла трека в «Загрузки» (пункт «Скачать трек» в меню «…» плеера).
+    pub download: bool,
+    /// Ещё и отдельная кнопка в панели плеера.
+    pub download_button: bool,
+    /// Версии треков без цензуры из открытого списка FckCensor.
+    pub uncensor: bool,
 }
 
 impl Default for Features {
@@ -94,9 +101,16 @@ impl Default for Features {
             lyrics_font_size: 22,
             wheel_volume: true,
             speed_control: false,
+            speed_step: 0.25,
+            pitch_with_speed: false,
+            reverb: 0,
+            volume_step: 5,
             window_title: true,
             hotkeys: true,
             no_select: true,
+            download: true,
+            download_button: false,
+            uncensor: true,
         }
     }
 }

@@ -8,6 +8,8 @@ fn main() {
             "open_manager",
             "page_window",
             "page_cookie",
+            "page_download",
+            "page_reveal_download",
             // страница первой загрузки интерфейса
             "client_status",
             "client_retry",

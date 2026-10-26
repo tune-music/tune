@@ -5,6 +5,7 @@ mod addons;
 mod asar;
 mod client;
 mod discord;
+mod download;
 mod intercept;
 mod media;
 mod proxy;
@@ -19,7 +20,8 @@ use base64::Engine;
 use serde::Serialize;
 use serde_json::{json, Value};
 use store::{Settings, Store};
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::image::Image;
+use tauri::menu::{IconMenuItem, Menu, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
@@ -159,7 +161,7 @@ fn push_payload(win: &WebviewWindow, state: &AppState) {
     let payloads: Vec<Value> = state.enabled().iter().filter_map(|id| state.addons.page_payload(id)).collect();
     let page: Vec<Value> = payloads
         .iter()
-        .map(|p| json!({ "id": p["id"], "name": p["name"], "aliases": p["aliases"], "css": p["css"], "settings": p["settings"] }))
+        .map(|p| json!({ "id": p["id"], "name": p["name"], "aliases": p["aliases"], "theme": p["theme"], "css": p["css"], "settings": p["settings"] }))
         .collect();
     let features = serde_json::to_string(&state.settings().features).unwrap_or_else(|_| "{}".into());
     let _ = win.eval(format!(
@@ -439,18 +441,61 @@ fn start_client_install(app: &AppHandle) {
     });
 }
 
+/// Иконки меню трея: маски прозрачности из icons/menu (make.py) в размерах 16/20/24/32.
+const MENU_ICONS: &[(&str, [&[u8]; 4])] = &[
+    ("music", [include_bytes!("../icons/menu/music_16.a8"), include_bytes!("../icons/menu/music_20.a8"), include_bytes!("../icons/menu/music_24.a8"), include_bytes!("../icons/menu/music_32.a8")]),
+    ("tune", [include_bytes!("../icons/menu/tune_16.a8"), include_bytes!("../icons/menu/tune_20.a8"), include_bytes!("../icons/menu/tune_24.a8"), include_bytes!("../icons/menu/tune_32.a8")]),
+    ("reload", [include_bytes!("../icons/menu/reload_16.a8"), include_bytes!("../icons/menu/reload_20.a8"), include_bytes!("../icons/menu/reload_24.a8"), include_bytes!("../icons/menu/reload_32.a8")]),
+    ("toggle", [include_bytes!("../icons/menu/toggle_16.a8"), include_bytes!("../icons/menu/toggle_20.a8"), include_bytes!("../icons/menu/toggle_24.a8"), include_bytes!("../icons/menu/toggle_32.a8")]),
+    ("next", [include_bytes!("../icons/menu/next_16.a8"), include_bytes!("../icons/menu/next_20.a8"), include_bytes!("../icons/menu/next_24.a8"), include_bytes!("../icons/menu/next_32.a8")]),
+    ("prev", [include_bytes!("../icons/menu/prev_16.a8"), include_bytes!("../icons/menu/prev_20.a8"), include_bytes!("../icons/menu/prev_24.a8"), include_bytes!("../icons/menu/prev_32.a8")]),
+    ("quit", [include_bytes!("../icons/menu/quit_16.a8"), include_bytes!("../icons/menu/quit_20.a8"), include_bytes!("../icons/menu/quit_24.a8"), include_bytes!("../icons/menu/quit_32.a8")]),
+];
+const MENU_ICON_SIZES: [u32; 4] = [16, 20, 24, 32];
+
+/// Светлая ли тема приложений Windows: меню трея рисуется в ней.
+fn light_theme() -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let out = std::process::Command::new("reg")
+            .args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "/v", "AppsUseLightTheme"])
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .output();
+        if let Ok(o) = out {
+            return String::from_utf8_lossy(&o.stdout).contains("0x1");
+        }
+    }
+    false
+}
+
+/// Иконка пункта меню под масштаб экрана и цвет текста меню.
+fn menu_icon(name: &str, scale: f64, light: bool) -> Option<Image<'static>> {
+    let (_, masks) = MENU_ICONS.iter().find(|(n, _)| *n == name)?;
+    let want = (16.0 * scale).round() as u32;
+    let i = MENU_ICON_SIZES.iter().position(|&s| s >= want).unwrap_or(MENU_ICON_SIZES.len() - 1);
+    let size = MENU_ICON_SIZES[i];
+    let (r, g, b) = if light { (0x2b, 0x2b, 0x2b) } else { (0xe6, 0xe6, 0xe6) };
+    let rgba: Vec<u8> = masks[i].iter().flat_map(|&a| [r, g, b, a]).collect();
+    Some(Image::new_owned(rgba, size, size))
+}
+
 fn create_tray(app: &AppHandle) -> tauri::Result<()> {
+    let scale = app.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
+    let light = light_theme();
+    let item = |id: &str, text: &str, icon: &str| IconMenuItem::with_id(app, id, text, true, menu_icon(icon, scale, light), None::<&str>);
     let menu = Menu::with_items(
         app,
         &[
-            &MenuItem::with_id(app, "show", "Открыть Яндекс Музыку", true, None::<&str>)?,
-            &MenuItem::with_id(app, "tune", "Tune — темы и плагины", true, None::<&str>)?,
+            &item("show", "Открыть Яндекс Музыку", "music")?,
+            &item("tune", "Tune — темы и плагины", "tune")?,
+            &item("restart", "Перезапустить Tune", "reload")?,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "toggle", "Пауза / продолжить", true, None::<&str>)?,
-            &MenuItem::with_id(app, "next", "Следующий трек", true, None::<&str>)?,
-            &MenuItem::with_id(app, "prev", "Предыдущий трек", true, None::<&str>)?,
+            &item("toggle", "Пауза / продолжить", "toggle")?,
+            &item("next", "Следующий трек", "next")?,
+            &item("prev", "Предыдущий трек", "prev")?,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?,
+            &item("quit", "Выход", "quit")?,
         ],
     )?;
 
@@ -463,6 +508,7 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
             "tune" => {
                 let _ = show_manager(app);
             }
+            "restart" => restart_app(app),
             "toggle" => eval_client(app, "window.__tune&&window.__tune.player.toggle()"),
             "next" => eval_client(app, "window.__tune&&window.__tune.player.next()"),
             "prev" => eval_client(app, "window.__tune&&window.__tune.player.prev()"),
@@ -484,6 +530,39 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     }
     tray.build(app)?;
     Ok(())
+}
+
+/// Полный перезапуск: новый процесс с теми же ключами и `--tune-restart=<pid>`, затем выход.
+/// Новый процесс ждёт, пока этот завершится, — иначе single-instance отдаст запуск старому.
+fn restart_app(app: &AppHandle) {
+    let Ok(exe) = std::env::current_exe() else { return };
+    let mut args: Vec<String> = std::env::args().skip(1).filter(|a| !a.starts_with("--tune-restart")).collect();
+    args.push(format!("--tune-restart={}", std::process::id()));
+    if std::process::Command::new(exe).args(&args).spawn().is_ok() {
+        app.exit(0);
+    }
+}
+
+/// После перезапуска из трея: ждём выхода прежнего процесса (до 10 секунд).
+fn wait_previous_instance() {
+    let Some(pid) = std::env::args().find_map(|a| a.strip_prefix("--tune-restart=").and_then(|p| p.parse::<u32>().ok())) else { return };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let started = std::time::Instant::now();
+        while started.elapsed() < std::time::Duration::from_secs(10) {
+            let out = std::process::Command::new("tasklist")
+                .args(["/FI", &format!("PID eq {pid}"), "/NH", "/FO", "CSV"])
+                .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+                .output();
+            match out {
+                Ok(o) if String::from_utf8_lossy(&o.stdout).contains(&format!("\"{pid}\"")) => std::thread::sleep(std::time::Duration::from_millis(200)),
+                _ => return,
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = pid;
 }
 
 /// Автозапуск с Windows: значение в HKCU\…\Run.
@@ -572,6 +651,42 @@ fn page_cookie(window: WebviewWindow, name: String) -> Option<String> {
         .into_iter()
         .find(|c| c.name() == name)
         .map(|c| c.value().to_string())
+}
+
+/// Кнопка «Скачать» в плеере: файл текущего трека в «Загрузки».
+#[tauri::command]
+fn page_download(app: AppHandle, url: String, key: Option<String>, codec: String, name: String, state: State<AppState>) -> Result<u64, String> {
+    if !state.settings().features.download {
+        return Err("Скачивание выключено в настройках Tune".into());
+    }
+    if !download::allowed_url(&url) {
+        return Err("Ссылка не на хранилище Яндекса".into());
+    }
+    let dir = app.path().download_dir().map_err(|e| e.to_string())?;
+    let handle = app.clone();
+    Ok(download::start(download::Job { url, key, codec, name }, dir, move |ev| {
+        eval_client(&handle, &format!("window.dispatchEvent(new CustomEvent('tune:download',{{detail:{ev}}}))"));
+    }))
+}
+
+/// Показывает скачанный файл в проводнике.
+#[tauri::command]
+fn page_reveal_download(id: u64) -> Result<(), String> {
+    let path = download::saved(id).ok_or("Файл не найден")?;
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("explorer.exe")
+            .raw_arg(format!("/select,\"{}\"", path.display()))
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = path;
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -1001,6 +1116,7 @@ fn addon_file_protocol(app: &AppHandle, uri: &str) -> tauri::http::Response<Vec<
 }
 
 fn main() {
+    wait_previous_instance();
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .register_uri_scheme_protocol("tuneaddon", |ctx, req| addon_file_protocol(ctx.app_handle(), &req.uri().to_string()))
@@ -1053,6 +1169,8 @@ fn main() {
             open_manager,
             page_window,
             page_cookie,
+            page_download,
+            page_reveal_download,
             client_status,
             client_retry,
             list_addons,

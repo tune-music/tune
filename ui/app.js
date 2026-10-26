@@ -177,6 +177,7 @@ function installedCard(a) {
         <div class="card-name" title="${esc(a.name)}">${esc(a.name)}</div>
         <div class="card-author">${esc(a.author || originLabel(a.origin))}${a.version ? ' · ' + esc(a.version) : ''}</div>
         <div class="card-desc">${esc(a.description || 'Без описания')}</div>
+        ${a.warning ? `<div class="card-warn" title="${esc(a.warning)}">Не работает в Tune</div>` : ''}
         <div class="card-foot">
           <input type="checkbox" class="switch" ${a.enabled ? 'checked' : ''} aria-label="Включить" data-act="toggle" />
           <span class="spacer"></span>
@@ -539,7 +540,7 @@ function openInstalledDrawer(a) {
        <button class="btn btn-ghost" data-act="folder">Папка</button>
        <button class="btn btn-ghost btn-danger" data-act="delete">Удалить</button>
      </div>
-     <div class="readme">${a.description ? `<p>${esc(a.description)}</p>` : ''}${a.hasExperiments ? '<p class="row-desc">Часть изменений темы применяется после перезагрузки страницы.</p>' : ''}</div>`
+     <div class="readme">${a.warning ? `<p class="addon-warn">${esc(a.warning)}</p>` : ''}${a.description ? `<p>${esc(a.description)}</p>` : ''}${a.hasExperiments ? '<p class="row-desc">Часть изменений темы применяется после перезагрузки страницы.</p>' : ''}</div>`
   );
   $('[data-toggle]', d).addEventListener('change', (ev) => toggleAddon(a, ev.target.checked).then(() => openInstalledDrawer(a)));
   $$('[data-act]', d).forEach((b) => {
@@ -808,6 +809,39 @@ const setPath = (obj, path, value) => {
   keys.reduce((o, k) => (o[k] ??= {}), obj)[last] = value;
 };
 
+// Куда ведёт клик в статусе Discord: варианты общие для названия, исполнителя, обложки и значка.
+const LINK_OPTIONS = [
+  ['track', 'Страница трека'],
+  ['album', 'Страница альбома'],
+  ['artist', 'Страница исполнителя'],
+  ['tune', 'Сайт Tune'],
+  ['custom', 'Своя ссылка'],
+  ['none', 'Ничего не открывать'],
+];
+for (const sel of $$('[data-link-select]')) {
+  sel.innerHTML = LINK_OPTIONS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+}
+
+// Разделы настроек — вкладки; выбранная запоминается.
+function showSection(name) {
+  if (!$(`#settings-tabs [data-section="${name}"]`)) name = 'player';
+  $$('#settings-tabs .tab').forEach((t) => t.classList.toggle('active', t.dataset.section === name));
+  $$('.settings-section').forEach((s) => s.classList.toggle('hidden', s.dataset.section !== name));
+  $('#view-settings').scrollTop = 0;
+  try {
+    localStorage.setItem('tune:settings-section', name);
+  } catch (e) {}
+}
+$('#settings-tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-section]');
+  if (tab) showSection(tab.dataset.section);
+});
+try {
+  showSection(localStorage.getItem('tune:settings-section') || 'player');
+} catch (e) {
+  showSection('player');
+}
+
 function fillSettings() {
   const s = state.settings;
   for (const input of $$('[data-key]', $('#settings-form'))) {
@@ -823,9 +857,11 @@ function fillSettings() {
 
 function syncDeps() {
   const s = state.settings;
-  for (const row of $$('[data-dep]')) row.classList.toggle('disabled', !getPath(s, row.dataset.dep));
-  for (const row of $$('[data-custom]')) row.classList.toggle('hidden', !getPath(s, 'discord.enabled') || getPath(s, row.dataset.custom + '.target') !== 'custom');
-  for (const span of $$('[data-value-of]')) span.textContent = `${getPath(s, span.dataset.valueOf)} px`;
+  // data-dep — одна или несколько настроек через пробел, все должны быть включены.
+  for (const row of $$('[data-dep]')) row.classList.toggle('disabled', !row.dataset.dep.split(' ').every((k) => getPath(s, k)));
+  // data-custom — поле своей ссылки под списком, видно, когда выбрана «Своя ссылка».
+  for (const row of $$('[data-custom]')) row.classList.toggle('hidden', !getPath(s, 'discord.enabled') || getPath(s, row.dataset.custom) !== 'custom');
+  for (const span of $$('[data-value-of]')) span.textContent = `${getPath(s, span.dataset.valueOf)} ${span.dataset.unit || ''}`.trim();
 }
 
 let saveTimer = 0;
@@ -869,3 +905,6 @@ async function loadSettings() {
 loadInstalled().catch(fail);
 loadSettings().catch(fail);
 invoke('reload_status').then(setReload).catch(() => {});
+
+// Под закреплённой панелью вкладок появляется черта, когда содержимое уехало под неё.
+for (const view of $$('.view')) view.addEventListener('scroll', () => view.classList.toggle('scrolled', view.scrollTop > 0), { passive: true });

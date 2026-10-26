@@ -55,6 +55,8 @@ pub struct Addon {
     pub has_experiments: bool,
     pub enabled: bool,
     pub origin: Origin,
+    /// Почему аддон не заработает в Tune (например, требует SDK PulseSync 2).
+    pub warning: Option<String>,
 }
 
 const SKIP_DIRS: &[&str] = &["assets", "node_modules", ".git", "src"];
@@ -201,6 +203,22 @@ impl Loaded {
         if n.is_empty() { self.id.trim_start_matches('!').to_string() } else { n }
     }
 
+    /// Аддоны под SDK PulseSync 2 (web host) сами проверяют его при запуске и без него
+    /// падают с «webhost-incompatible»: таких API в Tune нет.
+    fn warning(&self) -> Option<String> {
+        let needs_web_host = self.files("script", "js").iter().any(|f| {
+            fs::read_to_string(f).is_ok_and(|code| code.contains("__PULSESYNC_WEB_HOST__") && code.contains("webhost-incompatible"))
+        });
+        if !needs_web_host {
+            return None;
+        }
+        let mut text = "Аддон рассчитан на новый PulseSync (SDK web host) и в Tune не запускается.".to_string();
+        if self.name().to_lowercase().contains("fckcensor") {
+            text.push_str(" Вместо него включите «Без цензуры» в настройках Tune — там те же подмены треков.");
+        }
+        Some(text)
+    }
+
     fn files(&self, key: &str, ext: &str) -> Vec<PathBuf> {
         // PulseSync берёт ровно файл из metadata.json, Next Music — все файлы папки.
         let named = str_field(&self.meta, key);
@@ -327,6 +345,7 @@ impl Addons {
                     has_experiments: l.path.join("experiments.override").is_file(),
                     enabled: enabled.contains(&l.id),
                     origin: l.origin(),
+                    warning: l.warning(),
                     id: l.id,
                 }
             })
@@ -373,6 +392,7 @@ impl Addons {
             "id": l.id,
             "name": l.name(),
             "aliases": aliases,
+            "theme": l.kind() == Kind::Theme,
             "css": css,
             "js": js,
             "settings": self.settings_values(id).unwrap_or_default(),

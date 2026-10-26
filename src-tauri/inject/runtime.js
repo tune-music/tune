@@ -36,17 +36,37 @@
     }
     .tune-wbtn:hover { background: rgba(127,127,127,.18); color: var(--ym-controls-color-secondary-text-hovered, currentColor); }
     .tune-wbtn-close:hover { background: #c42b1c; color: #fff; }
-    #tune-toast {
-      position: fixed; left: 50%; bottom: 110px; transform: translate(-50%, 8px); max-width: min(560px, 80vw);
-      display: flex; align-items: center; gap: 10px;
+    /* Уведомления: одна колонка по центру над плеером. Обычное уведомление одно и плавно
+       сменяется следующим; карточки с ходом дела (скачивание) стоят над ним. */
+    #tune-toasts {
+      position: fixed; left: 50%; bottom: 110px; transform: translateX(-50%); width: max-content; max-width: min(560px, 80vw);
+      display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; z-index: 2147483001;
+    }
+    .tune-toast {
+      position: relative; box-sizing: border-box; max-width: min(560px, 80vw); overflow: hidden;
       padding: 10px 14px; border-radius: 10px; background: rgba(24,24,27,.96); color: #fafafa;
       border: 1px solid rgba(255,255,255,.1); box-shadow: 0 8px 30px rgba(0,0,0,.35);
-      font: 500 13px/1.4 system-ui, sans-serif;
-      opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; z-index: 2147483001;
+      font: 500 13px/1.4 system-ui, sans-serif; pointer-events: auto; transition: border-color .2s;
     }
-    #tune-toast.tune-error { border-color: rgba(248,113,113,.5); }
-    #tune-toast img { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; }
-    #tune-toast.tune-visible { opacity: 1; transform: translate(-50%, 0); }
+    .tune-toast.tune-error { border-color: rgba(248,113,113,.5); }
+    .tune-toast-body { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+    .tune-toast-body.tune-leaving { position: absolute; left: 14px; top: 10px; }
+    .tune-toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .tune-toast img { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; flex: none; }
+    .tune-toast.tune-task { width: min(360px, 80vw); }
+    .tune-toast.tune-task .tune-toast-body { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 6px; }
+    .tune-toast.tune-task img { grid-row: 1 / 3; }
+    .tune-toast.tune-task .tune-toast-info { opacity: .6; font-variant-numeric: tabular-nums; }
+    .tune-toast-bar { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); overflow: hidden; }
+    .tune-toast-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--ym-controls-color-primary-text-enabled, #fc3); transition: width .15s linear, background-color .2s; }
+    .tune-toast-bar.tune-wait i { width: 30%; animation: tune-toast-wait 1s ease-in-out infinite alternate; }
+    @keyframes tune-toast-wait { from { margin-left: 0; } to { margin-left: 70%; } }
+    .tune-toast.tune-ok .tune-toast-bar i { background: #4ade80; }
+    .tune-toast.tune-error .tune-toast-bar { display: none; }
+    .tune-toast.tune-error .tune-toast-info { color: #fca5a5; opacity: 1; }
+    .tune-toast.tune-task.tune-error .tune-toast-text { white-space: normal; }
+    .tune-toast.tune-clickable { cursor: pointer; }
+    .tune-toast.tune-clickable:hover { background: rgba(39,39,42,.97); }
   `);
 
   // -------------------------------------------------------------------------
@@ -348,31 +368,142 @@
   // -------------------------------------------------------------------------
   // Уведомление
   // -------------------------------------------------------------------------
-  let toastEl = null;
-  let toastTimer = 0;
-  const toast = (text, opts = {}) => {
-    if (!document.body) return null;
-    if (!toastEl) {
-      toastEl = document.createElement('div');
-      toastEl.id = 'tune-toast';
-      toastEl.setAttribute('role', 'status');
+  const EASE = 'cubic-bezier(.2,.8,.2,1)';
+  const toastHost = () => {
+    let host = document.getElementById('tune-toasts');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'tune-toasts';
+      host.setAttribute('role', 'status');
     }
-    if (!toastEl.isConnected) document.body.appendChild(toastEl);
-    toastEl.textContent = '';
-    if (opts.cover) {
+    if (!host.isConnected) document.body.appendChild(host);
+    return host;
+  };
+  const animateIn = (el) => el.animate([{ opacity: 0, transform: 'translateY(10px) scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE });
+  // Уходящая карточка схлопывается по высоте, чтобы соседние съезжали плавно.
+  const animateOut = (el) => {
+    if (el.dataset.leaving) return;
+    el.dataset.leaving = '1';
+    const h = el.offsetHeight;
+    el.animate(
+      [
+        { opacity: 1, transform: 'none', height: `${h}px`, marginTop: '0px' },
+        { opacity: 0, transform: 'translateY(-6px) scale(.97)', height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '-8px' },
+      ],
+      { duration: 220, easing: EASE, fill: 'forwards' }
+    ).onfinish = () => el.remove();
+  };
+  const toastBody = (text, cover) => {
+    const body = document.createElement('div');
+    body.className = 'tune-toast-body';
+    if (cover) {
       const img = document.createElement('img');
-      img.src = opts.cover;
+      img.src = cover;
       img.alt = '';
-      toastEl.appendChild(img);
+      body.appendChild(img);
     }
     const span = document.createElement('span');
+    span.className = 'tune-toast-text';
     span.textContent = typeof text === 'string' ? text : String(text && text.textContent ? text.textContent : text);
-    toastEl.appendChild(span);
-    toastEl.classList.toggle('tune-error', !!opts.error);
-    toastEl.classList.add('tune-visible');
+    body.appendChild(span);
+    return body;
+  };
+  // Смена содержимого: старое уходит вверх, новое приходит снизу, ширина карточки тянется.
+  const swapBody = (card, body) => {
+    const old = card.querySelector(':scope > .tune-toast-body:not(.tune-leaving)');
+    const from = card.offsetWidth;
+    if (old) {
+      old.classList.add('tune-leaving');
+      old.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-10px)' }], { duration: 180, easing: EASE, fill: 'forwards' }).onfinish = () => old.remove();
+    }
+    card.appendChild(body);
+    const to = card.offsetWidth;
+    if (old) {
+      body.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE });
+      if (from !== to) card.animate([{ width: `${from}px` }, { width: `${to}px` }], { duration: 220, easing: EASE });
+    }
+  };
+
+  let toastCard = null;
+  let toastTimer = 0;
+  let toastWord = '';
+  const toast = (text, opts = {}) => {
+    if (!document.body) return null;
+    const host = toastHost();
+    const str = typeof text === 'string' ? text : String(text && text.textContent ? text.textContent : text);
+    const word = str.split(' ')[0];
+    const alive = toastCard && toastCard.isConnected && !toastCard.dataset.leaving;
+    if (alive && !opts.cover && !toastCard.querySelector('img') && word === toastWord && !!opts.error === toastCard.classList.contains('tune-error')) {
+      // «Громкость 45 %» → «Громкость 50 %»: то же уведомление, меняется только текст.
+      toastCard.querySelector('.tune-toast-body:not(.tune-leaving) .tune-toast-text').textContent = str;
+    } else if (alive) {
+      toastCard.classList.toggle('tune-error', !!opts.error);
+      swapBody(toastCard, toastBody(str, opts.cover));
+    } else {
+      toastCard = document.createElement('div');
+      toastCard.className = 'tune-toast';
+      toastCard.classList.toggle('tune-error', !!opts.error);
+      toastCard.appendChild(toastBody(str, opts.cover));
+      host.appendChild(toastCard);
+      animateIn(toastCard);
+    }
+    toastWord = word;
+    // Обычное уведомление всегда ниже карточек с ходом дела — ближе к плееру.
+    if (host.lastElementChild !== toastCard) host.appendChild(toastCard);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove('tune-visible'), opts.ms || 2600);
+    const card = toastCard;
+    toastTimer = setTimeout(() => animateOut(card), opts.ms || 2600);
     return 'tune-toast';
+  };
+
+  // Карточка с ходом дела (скачивание): живёт, пока её не закроют.
+  // set({ text, info, progress: 0..1 | null (неизвестно) | undefined (без полосы), cover, error, ok, onClick })
+  const task = (init = {}) => {
+    const card = document.createElement('div');
+    card.className = 'tune-toast tune-task';
+    const body = document.createElement('div');
+    body.className = 'tune-toast-body';
+    body.innerHTML = '<img alt="" /><span class="tune-toast-text"></span><span class="tune-toast-info"></span><div class="tune-toast-bar"><i></i></div>';
+    card.appendChild(body);
+    let onClick = null;
+    card.addEventListener('click', () => onClick && onClick());
+    let timer = 0;
+    const handle = {
+      set(o) {
+        if ('text' in o) body.querySelector('.tune-toast-text').textContent = o.text || '';
+        if ('info' in o) body.querySelector('.tune-toast-info').textContent = o.info || '';
+        if ('title' in o) card.title = o.title || '';
+        if ('cover' in o) {
+          const img = body.querySelector('img');
+          if (o.cover) img.src = o.cover;
+          img.style.visibility = o.cover ? '' : 'hidden';
+        }
+        if ('progress' in o) {
+          const bar = body.querySelector('.tune-toast-bar');
+          bar.style.display = o.progress === undefined ? 'none' : '';
+          bar.classList.toggle('tune-wait', o.progress === null);
+          if (typeof o.progress === 'number') bar.firstChild.style.width = `${Math.min(100, o.progress * 100).toFixed(1)}%`;
+        }
+        if ('error' in o) card.classList.toggle('tune-error', !!o.error);
+        if ('ok' in o) card.classList.toggle('tune-ok', !!o.ok);
+        if ('onClick' in o) {
+          onClick = o.onClick || null;
+          card.classList.toggle('tune-clickable', !!onClick);
+        }
+        return handle;
+      },
+      close(ms = 0) {
+        clearTimeout(timer);
+        timer = setTimeout(() => animateOut(card), ms);
+      },
+    };
+    handle.set({ progress: null, cover: '', ...init });
+    if (document.body) {
+      const host = toastHost();
+      host.insertBefore(card, toastCard && toastCard.parentNode === host ? toastCard : null);
+      animateIn(card);
+    }
+    return handle;
   };
 
   // -------------------------------------------------------------------------
@@ -404,6 +535,9 @@
         const el = old[i] || document.createElement('style');
         el.dataset.tuneAddon = a.id;
         el.dataset.file = c.file;
+        // Тема перекрашивает интерфейс — по этому признаку окна Tune подстраиваются под неё.
+        if (a.theme) el.dataset.tuneTheme = '1';
+        else delete el.dataset.tuneTheme;
         if (el.textContent !== c.text) el.textContent = c.text;
         return el;
       });
@@ -548,6 +682,7 @@
     ym,
     player,
     toast,
+    task,
     invoke,
     get track() {
       return current;

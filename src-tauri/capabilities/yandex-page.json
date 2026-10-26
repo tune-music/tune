@@ -18,6 +18,8 @@
     "allow-page-scripts",
     "allow-open-manager",
     "allow-page-window",
-    "allow-page-cookie"
+    "allow-page-cookie",
+    "allow-page-download",
+    "allow-page-reveal-download"
   ]
 }
