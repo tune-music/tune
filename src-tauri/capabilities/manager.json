@@ -19,7 +19,6 @@
     "allow-install-from-catalog",
     "allow-install-from-url",
     "allow-install-upload",
-    "allow-import-from-mods",
     "allow-create-addon",
     "allow-read-addon-file",
     "allow-write-addon-file",

@@ -1,9 +1,11 @@
 //! Каталог аддонов из открытых репозиториев.
 //!
-//! Источник — github.com/Web-Next-Music/Next-Music-Extensions: папки Addons/ и Themes/,
-//! часть из них — подключённые репозитории авторов (git submodule). Аддоны оттуда
-//! совместимы с Tune (см. addons.rs). Список кешируется на диске на 6 часов: у GitHub API
-//! без входа лимит 60 запросов в час, а каталог тратит около десятка.
+//! Источники — репозитории на GitHub:
+//!   * сборники с папками тем и аддонов (Next Music Extensions, темы dundut); часть папок —
+//!     подключённые репозитории авторов (git submodule);
+//!   * отдельные репозитории аддонов PulseSync (магазин PulseSync без входа закрыт).
+//! Аддоны оттуда совместимы с Tune (см. addons.rs). Список кешируется на диске на 6 часов:
+//! у GitHub API без входа лимит 60 запросов в час, а каталог тратит около двадцати.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -12,9 +14,23 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const MAIN_REPO: &str = "Web-Next-Music/Next-Music-Extensions";
+/// Сборники: (репозиторий, префикс id, папка тем, папка аддонов).
+const COLLECTIONS: &[(&str, &str, &str, &str)] = &[
+    ("Web-Next-Music/Next-Music-Extensions", "nm", "Themes", "Addons"),
+    ("absolute2007/next-music-themes", "dundut", "themes", "addons"),
+];
+
+/// Отдельные репозитории аддонов PulseSync: (репозиторий, название, это тема).
+/// Ставятся из готового пакета в выпусках или прямо из репозитория, если там уже лежит аддон.
+const SINGLES: &[(&str, &str, bool)] = &[
+    ("Hazzz895/FckCensor", "FckCensor", false),
+    ("Desai0/ChromaSync", "ChromaSync", true),
+    ("Imperiadicks/Colorize-2", "Colorize 2", true),
+    ("dieughh/MinimalisticWaveTab", "Minimalistic Wave Tab", false),
+    ("PulseSync-LLC/BetterPlayer-addon", "BetterPlayer", false),
+];
 const CACHE_TTL: u64 = 6 * 3600;
-const UA: &str = "TuneMusic/0.2 (+https://github.com)";
+const UA: &str = concat!("TuneMusic/", env!("CARGO_PKG_VERSION"), " (+https://github.com/tune-music/tune)");
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -129,6 +145,31 @@ fn parse_gitmodules(text: &str) -> Vec<(String, String)> {
     out
 }
 
+/// [текст](ссылка) → текст, без пометок вроде [!IMPORTANT].
+fn strip_markdown(s: &str) -> String {
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(i) = rest.find('[') {
+        out.push_str(&rest[..i]);
+        let after = &rest[i + 1..];
+        let Some(close) = after.find(']') else {
+            out.push_str(&rest[i..]);
+            return out.trim().to_string();
+        };
+        let text = &after[..close];
+        let mut tail = &after[close + 1..];
+        if let Some(link) = tail.strip_prefix('(') {
+            tail = link.find(')').map(|j| &link[j + 1..]).unwrap_or(link);
+        }
+        if !text.starts_with('!') {
+            out.push_str(text);
+        }
+        rest = tail;
+    }
+    out.push_str(rest);
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// Первый абзац README без заголовков и картинок — как описание.
 fn readme_summary(md: &str) -> String {
     let mut para = String::new();
@@ -151,7 +192,7 @@ fn readme_summary(md: &str) -> String {
         }
         para.push_str(l.trim_start_matches(['-', '*', '>', ' ']));
     }
-    let clean: String = para.replace("**", "").replace('`', "");
+    let clean = strip_markdown(&para.replace("**", "").replace('`', ""));
     clean.chars().take(240).collect()
 }
 
@@ -238,26 +279,31 @@ fn blob_paths(tree: &Value) -> Vec<(String, String, String)> {
         .unwrap_or_default()
 }
 
-fn fetch_all() -> Result<Vec<Entry>, String> {
-    let tree = get_json(&format!("https://api.github.com/repos/{MAIN_REPO}/git/trees/HEAD?recursive=1"))?;
+/// Записи одного сборника: папки тем и аддонов, включая подключённые репозитории.
+fn collection_entries(repo: &str, prefix: &str, themes: &str, addons: &str) -> Result<Vec<Entry>, String> {
+    let tree = get_json(&format!("https://api.github.com/repos/{repo}/git/trees/HEAD?recursive=1"))?;
     let nodes = blob_paths(&tree);
-    let modules = get_text(&raw_url(MAIN_REPO, ".gitmodules")).map(|t| parse_gitmodules(&t)).unwrap_or_default();
+    let modules = get_text(&raw_url(repo, ".gitmodules")).map(|t| parse_gitmodules(&t)).unwrap_or_default();
 
     let mut jobs: Vec<Entry> = Vec::new();
     for (path, ty, sha) in &nodes {
         let mut parts = path.splitn(3, '/');
         let (Some(top), Some(name), None) = (parts.next(), parts.next(), parts.next()) else { continue };
-        let kind = match top {
-            "Themes" => crate::addons::Kind::Theme,
-            "Addons" => crate::addons::Kind::Script,
-            _ => continue,
+        let kind = if top == themes {
+            crate::addons::Kind::Theme
+        } else if top == addons {
+            crate::addons::Kind::Script
+        } else {
+            continue;
         };
-        let mut e = Entry { id: format!("nm:{path}"), name: name.to_string(), kind, sha: sha.clone(), ..Default::default() };
+        // id сборника Next Music без репозитория — так он записан у уже установленных аддонов.
+        let id = if prefix == "nm" { format!("nm:{path}") } else { format!("{prefix}:{repo}/{path}") };
+        let mut e = Entry { id, name: name.to_string(), kind, sha: sha.clone(), ..Default::default() };
         match ty.as_str() {
             "tree" => {
-                e.repo = MAIN_REPO.into();
+                e.repo = repo.into();
                 e.path = path.clone();
-                e.homepage = format!("https://github.com/{MAIN_REPO}/tree/HEAD/{}", enc(path));
+                e.homepage = format!("https://github.com/{repo}/tree/HEAD/{}", enc(path));
                 e.files = nodes
                     .iter()
                     .filter(|(p, t, _)| t == "blob" && p.starts_with(&format!("{path}/")))
@@ -273,17 +319,45 @@ fn fetch_all() -> Result<Vec<Entry>, String> {
         }
         jobs.push(e);
     }
+    Ok(jobs)
+}
+
+fn fetch_all() -> Result<Vec<Entry>, String> {
+    let mut jobs: Vec<Entry> = Vec::new();
+    let mut errors = Vec::new();
+    for (repo, prefix, themes, addons) in COLLECTIONS {
+        match collection_entries(repo, prefix, themes, addons) {
+            Ok(list) => jobs.extend(list),
+            Err(e) => errors.push(e),
+        }
+    }
+    for (repo, name, theme) in SINGLES {
+        jobs.push(Entry {
+            id: format!("gh:{repo}"),
+            name: name.to_string(),
+            kind: if *theme { crate::addons::Kind::Theme } else { crate::addons::Kind::Script },
+            repo: repo.to_string(),
+            homepage: format!("https://github.com/{repo}"),
+            ..Default::default()
+        });
+    }
+    if jobs.len() == SINGLES.len() {
+        return Err(errors.join("; "));
+    }
 
     // Подробности качаем параллельно: raw.githubusercontent.com не тратит лимит API.
     let handles: Vec<_> = jobs
         .into_iter()
         .map(|mut e| {
             thread::spawn(move || {
-                if e.repo == MAIN_REPO {
+                if !e.files.is_empty() {
                     let files = e.files.clone();
                     let base = e.path.clone();
                     enrich(&mut e, &files, &base);
                 } else if let Ok(t) = get_json(&format!("https://api.github.com/repos/{}/git/trees/HEAD?recursive=1", e.repo)) {
+                    if e.sha.is_empty() {
+                        e.sha = t.get("sha").and_then(|s| s.as_str()).unwrap_or_default().to_string();
+                    }
                     let files: Vec<String> = blob_paths(&t).into_iter().filter(|(_, ty, _)| ty == "blob").map(|(p, _, _)| p).collect();
                     // Аддон может лежать в подпапке репозитория (например, «Colorful III/»).
                     let base = files
@@ -316,7 +390,7 @@ fn fetch_all() -> Result<Vec<Entry>, String> {
 }
 
 fn cache_path(root: &Path) -> PathBuf {
-    root.join("cache").join("catalog.json")
+    root.join("cache").join("catalog-v2.json")
 }
 
 /// Каталог: из кеша, если он свежий, иначе с GitHub. При ошибке сети отдаёт старый кеш.
@@ -349,7 +423,7 @@ pub fn find(root: &Path, id: &str) -> Option<Entry> {
 pub fn download(e: &Entry, tmp: &Path) -> Result<Download, String> {
     let _ = fs::remove_dir_all(tmp);
     fs::create_dir_all(tmp).map_err(|e| e.to_string())?;
-    if e.repo == MAIN_REPO {
+    if !e.files.is_empty() {
         for f in &e.files {
             let rel = f.strip_prefix(&format!("{}/", e.path)).unwrap_or(f);
             let dst = tmp.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
@@ -410,5 +484,6 @@ mod tests {
     #[test]
     fn summary() {
         assert_eq!(readme_summary("# Title\n![img](x)\n\nHello **world**\nline two\n\nmore"), "Hello world line two");
+        assert_eq!(strip_markdown("[!IMPORTANT] Спасибо [Diramix](https://github.com/Diramix) за помощь"), "Спасибо Diramix за помощь");
     }
 }

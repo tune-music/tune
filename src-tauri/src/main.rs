@@ -781,18 +781,6 @@ fn install_upload(app: AppHandle, files: Vec<UploadFile>, state: State<AppState>
 }
 
 #[tauri::command]
-fn import_from_mods(app: AppHandle, state: State<AppState>) -> Result<Value, String> {
-    let (imported, enabled) = state.addons.import_from_mods();
-    state.update_settings(|s| {
-        for id in &enabled {
-            s.set_enabled(id, true);
-        }
-    })?;
-    refresh_client(&app);
-    Ok(json!({ "imported": imported.len(), "enabled": enabled.len(), "reload": state.reload_needed() }))
-}
-
-#[tauri::command]
 fn create_addon(app: AppHandle, kind: Kind, name: String, state: State<AppState>) -> Result<Changed, String> {
     let name = if name.trim().is_empty() { "Без названия".to_string() } else { name.trim().to_string() };
     let id = state.addons.create(kind, &name)?;
@@ -1077,7 +1065,6 @@ fn main() {
             install_from_catalog,
             install_from_url,
             install_upload,
-            import_from_mods,
             create_addon,
             read_addon_file,
             write_addon_file,

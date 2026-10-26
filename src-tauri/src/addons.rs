@@ -618,49 +618,6 @@ impl Addons {
         fs::remove_dir_all(l.path).map_err(|e| e.to_string())
     }
 
-    /// Переносит аддоны, установленные в PulseSync и Next Music. Возвращает (новые, включённые в том моде).
-    pub fn import_from_mods(&self) -> (Vec<String>, Vec<String>) {
-        let Ok(appdata) = std::env::var("APPDATA") else { return (Vec::new(), Vec::new()) };
-        let sources = [
-            (PathBuf::from(&appdata).join("next-music").join("Addons"), "next-music"),
-            (PathBuf::from(&appdata).join("PulseSync").join("addons"), "pulsesync"),
-        ];
-        let known: Vec<String> = self.all().iter().map(|l| l.name().to_lowercase()).collect();
-        let enabled_ps = pulsesync_enabled(&PathBuf::from(&appdata).join("PulseSync"));
-        let mut imported = Vec::new();
-        let mut enabled = Vec::new();
-        for (dir, from) in sources {
-            for e in fs::read_dir(&dir).into_iter().flatten().flatten() {
-                let path = e.path();
-                let folder = e.file_name().to_string_lossy().to_string();
-                if !path.is_dir() || folder.starts_with('.') || folder == "Default" {
-                    continue;
-                }
-                let meta = read_json(&path.join("metadata.json")).unwrap_or_else(|| json!({}));
-                let mut name = str_field(&meta, "name");
-                if name.is_empty() {
-                    name = folder.trim_start_matches('!').to_string();
-                }
-                if known.contains(&name.to_lowercase()) || addon_root(&path).is_none() {
-                    continue;
-                }
-                let origin = Origin { source: "import".into(), store_id: format!("{from}:{folder}"), sha: String::new() };
-                if let Ok(id) = self.install_dir(&path, &name, origin) {
-                    // В Next Music «!» в начале имени папки означает «выключен».
-                    let on = match from {
-                        "next-music" => !folder.starts_with('!'),
-                        _ => enabled_ps.iter().any(|x| x == &folder || x.eq_ignore_ascii_case(&name)),
-                    };
-                    if on {
-                        enabled.push(id.clone());
-                    }
-                    imported.push(id);
-                }
-            }
-        }
-        (imported, enabled)
-    }
-
     /// Старые одиночные файлы themes/*.css и plugins/*.js из Tune 0.1. Встроенный каталог
     /// больше не поставляется, его файлы удаляются; свои файлы становятся аддонами.
     pub fn migrate_legacy(&self, root: &Path) {
@@ -688,28 +645,6 @@ impl Addons {
             }
         }
     }
-}
-
-/// Какие аддоны включены в PulseSync (pulsesync_settings.json хранит их по-разному в разных версиях).
-fn pulsesync_enabled(root: &Path) -> Vec<String> {
-    let Some(v) = read_json(&root.join("pulsesync_settings.json")) else { return Vec::new() };
-    let mut out = Vec::new();
-    let mut visit = |v: &Value| {
-        if let Some(a) = v.as_array() {
-            out.extend(a.iter().filter_map(|x| x.as_str().map(String::from)));
-        } else if let Some(s) = v.as_str() {
-            out.push(s.to_string());
-        }
-    };
-    for key in ["enabledScripts", "enabledAddons", "selectedTheme", "theme", "addons"] {
-        if let Some(x) = v.get(key) {
-            visit(x);
-        }
-        if let Some(x) = v.get("addons").and_then(|a| a.get(key)) {
-            visit(x);
-        }
-    }
-    out
 }
 
 /// Папка внутри распакованного архива, где лежит сам аддон.

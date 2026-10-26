@@ -223,7 +223,7 @@ function render() {
       empty.classList.remove('hidden');
       empty.innerHTML = state.installed.length
         ? '<strong>Ничего не нашлось</strong>Попробуйте другой запрос или фильтр.'
-        : '<strong>Пока ничего не установлено</strong>Темы и скрипты — во вкладке «Обзор». Аддоны из PulseSync и Next Music переносятся за один клик.<br><button class="btn" data-empty="browse">Открыть обзор</button> <button class="btn btn-ghost" data-empty="import">Перенести из других модов</button>';
+        : '<strong>Пока ничего не установлено</strong>Темы и скрипты — во вкладке «Обзор».<br><button class="btn" data-empty="browse">Открыть обзор</button>';
     }
     return;
   }
@@ -248,7 +248,6 @@ function render() {
 $('#empty').addEventListener('click', (e) => {
   const act = e.target.closest('[data-empty]')?.dataset.empty;
   if (act === 'browse') $('.tab[data-tab="browse"]').click();
-  if (act === 'import') importFromMods();
   if (act === 'retry') loadCatalog(true);
 });
 
@@ -402,7 +401,6 @@ $('#add-menu').addEventListener('click', (e) => {
   if (act === 'file') $('#file-input').click();
   if (act === 'folder') $('#folder-input').click();
   if (act === 'url') installFromUrl();
-  if (act === 'import') importFromMods();
   if (act === 'theme' || act === 'script') createAddon(act);
 });
 
@@ -451,18 +449,6 @@ async function installFromUrl() {
     await loadInstalled();
     showInstalledTab();
     toast('Аддон установлен и включён');
-  } catch (err) {
-    fail(err);
-  }
-}
-
-async function importFromMods() {
-  try {
-    const res = await invoke('import_from_mods');
-    setReload(res.reload);
-    await loadInstalled();
-    showInstalledTab();
-    toast(res.imported ? `Перенесено: ${res.imported}, из них включено, как было в том моде: ${res.enabled}` : 'Новых аддонов в PulseSync и Next Music не нашлось');
   } catch (err) {
     fail(err);
   }

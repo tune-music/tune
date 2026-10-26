@@ -22,7 +22,6 @@ fn main() {
             "install_from_catalog",
             "install_from_url",
             "install_upload",
-            "import_from_mods",
             "create_addon",
             "read_addon_file",
             "write_addon_file",
