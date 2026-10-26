@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reload-client"
+description = "Enables the reload_client command without any pre-configured scope."
+commands.allow = ["reload_client"]
+
+[[permission]]
+identifier = "deny-reload-client"
+description = "Denies the reload_client command without any pre-configured scope."
+commands.deny = ["reload_client"]

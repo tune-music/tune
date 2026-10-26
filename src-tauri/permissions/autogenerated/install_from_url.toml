@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-install-from-url"
+description = "Enables the install_from_url command without any pre-configured scope."
+commands.allow = ["install_from_url"]
+
+[[permission]]
+identifier = "deny-install-from-url"
+description = "Denies the install_from_url command without any pre-configured scope."
+commands.deny = ["install_from_url"]

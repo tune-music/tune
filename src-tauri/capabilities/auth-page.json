@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "auth-page",
+  "description": "Страницы входа Яндекс ID в главном окне: только кнопки окна (оно без рамки)",
+  "windows": ["main"],
+  "remote": {
+    "urls": [
+      "https://passport.yandex.ru/*",
+      "https://passport.yandex.com/*",
+      "https://oauth.yandex.ru/*",
+      "https://oauth.yandex.com/*",
+      "https://sso.passport.yandex.ru/*",
+      "https://sso.ya.ru/*"
+    ]
+  },
+  "permissions": ["allow-page-window"]
+}

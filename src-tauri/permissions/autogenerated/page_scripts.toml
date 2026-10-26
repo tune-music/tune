@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-scripts"
+description = "Enables the page_scripts command without any pre-configured scope."
+commands.allow = ["page_scripts"]
+
+[[permission]]
+identifier = "deny-page-scripts"
+description = "Denies the page_scripts command without any pre-configured scope."
+commands.deny = ["page_scripts"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-delete-addon"
+description = "Enables the delete_addon command without any pre-configured scope."
+commands.allow = ["delete_addon"]
+
+[[permission]]
+identifier = "deny-delete-addon"
+description = "Denies the delete_addon command without any pre-configured scope."
+commands.deny = ["delete_addon"]

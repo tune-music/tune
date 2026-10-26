@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-install-upload"
+description = "Enables the install_upload command without any pre-configured scope."
+commands.allow = ["install_upload"]
+
+[[permission]]
+identifier = "deny-install-upload"
+description = "Denies the install_upload command without any pre-configured scope."
+commands.deny = ["install_upload"]

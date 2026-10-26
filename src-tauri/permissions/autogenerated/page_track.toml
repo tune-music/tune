@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-track"
+description = "Enables the page_track command without any pre-configured scope."
+commands.allow = ["page_track"]
+
+[[permission]]
+identifier = "deny-page-track"
+description = "Denies the page_track command without any pre-configured scope."
+commands.deny = ["page_track"]

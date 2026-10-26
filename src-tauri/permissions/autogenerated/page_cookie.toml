@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-cookie"
+description = "Enables the page_cookie command without any pre-configured scope."
+commands.allow = ["page_cookie"]
+
+[[permission]]
+identifier = "deny-page-cookie"
+description = "Denies the page_cookie command without any pre-configured scope."
+commands.deny = ["page_cookie"]

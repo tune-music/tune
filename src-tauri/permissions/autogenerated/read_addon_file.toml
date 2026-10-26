@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-addon-file"
+description = "Enables the read_addon_file command without any pre-configured scope."
+commands.allow = ["read_addon_file"]
+
+[[permission]]
+identifier = "deny-read-addon-file"
+description = "Denies the read_addon_file command without any pre-configured scope."
+commands.deny = ["read_addon_file"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-client-retry"
+description = "Enables the client_retry command without any pre-configured scope."
+commands.allow = ["client_retry"]
+
+[[permission]]
+identifier = "deny-client-retry"
+description = "Denies the client_retry command without any pre-configured scope."
+commands.deny = ["client_retry"]

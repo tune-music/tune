@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "yandex-page",
+  "description": "Минимальный доступ для страницы Яндекс Музыки и плагинов, работающих в ней",
+  "windows": ["main"],
+  "remote": {
+    "urls": [
+      "https://music.yandex.ru/*",
+      "https://music.yandex.com/*",
+      "https://music.yandex.by/*",
+      "https://music.yandex.kz/*",
+      "https://music.yandex.uz/*"
+    ]
+  },
+  "permissions": [
+    "allow-page-ready",
+    "allow-page-track",
+    "allow-page-scripts",
+    "allow-open-manager",
+    "allow-page-window",
+    "allow-page-cookie"
+  ]
+}

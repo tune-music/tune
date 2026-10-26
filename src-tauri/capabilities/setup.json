@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "setup",
+  "description": "Страница первой загрузки интерфейса Яндекс Музыки в главном окне",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-minimize",
+    "core:window:allow-close",
+    "allow-client-status",
+    "allow-client-retry"
+  ]
+}
