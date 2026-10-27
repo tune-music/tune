@@ -17,8 +17,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// Сборники: (репозиторий, префикс id, папка тем, папка аддонов).
 const COLLECTIONS: &[(&str, &str, &str, &str)] = &[
     ("Web-Next-Music/Next-Music-Extensions", "nm", "Themes", "Addons"),
-    ("absolute2007/next-music-themes", "dundut", "themes", "addons"),
+    ("tune-music/next-music-themes", "dundut", "themes", "addons"),
 ];
+
+/// Репозиторий в id записей сборника. Темы dundut переехали в организацию tune-music,
+/// а id установленных тем остаются прежними — по ним Tune находит их обновления.
+fn id_repo(repo: &str) -> &str {
+    if repo == "tune-music/next-music-themes" { "absolute2007/next-music-themes" } else { repo }
+}
 
 /// Отдельные репозитории аддонов PulseSync: (репозиторий, название, это тема).
 /// Ставятся из готового пакета в выпусках или прямо из репозитория, если там уже лежит аддон.
@@ -297,7 +303,7 @@ fn collection_entries(repo: &str, prefix: &str, themes: &str, addons: &str) -> R
             continue;
         };
         // id сборника Next Music без репозитория — так он записан у уже установленных аддонов.
-        let id = if prefix == "nm" { format!("nm:{path}") } else { format!("{prefix}:{repo}/{path}") };
+        let id = if prefix == "nm" { format!("nm:{path}") } else { format!("{prefix}:{}/{path}", id_repo(repo)) };
         let mut e = Entry { id, name: name.to_string(), kind, sha: sha.clone(), ..Default::default() };
         match ty.as_str() {
             "tree" => {
