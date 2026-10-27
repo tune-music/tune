@@ -12,6 +12,7 @@ mod mixer;
 mod proxy;
 mod repo;
 mod store;
+mod update;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -83,6 +84,8 @@ struct AppState {
     discord: discord::Handle,
     client: Mutex<ClientState>,
     page: Mutex<PageState>,
+    /// Найденное обновление, о котором ещё не спросили или не ответили.
+    update: Mutex<Option<update::Release>>,
 }
 
 /// Состояние локального интерфейса Яндекс Музыки.
@@ -598,6 +601,10 @@ fn set_autostart(on: bool) -> Result<(), String> {
 #[tauri::command]
 fn page_ready(window: WebviewWindow, state: State<AppState>) {
     push_payload(&window, &state);
+    // Обновление нашлось до загрузки страницы — предлагаем его сейчас.
+    if let Some(rel) = state.update.lock().unwrap().clone() {
+        let _ = window.eval(update_event(&available(&rel)));
+    }
 }
 
 #[tauri::command]
@@ -1003,6 +1010,7 @@ fn set_settings(app: AppHandle, settings: Settings, state: State<AppState>) -> R
         s.autostart = settings.autostart;
         s.start_minimized = settings.start_minimized;
         s.zoom = settings.zoom.clamp(0.5, 2.0);
+        s.auto_update = settings.auto_update;
     })?;
     state.discord.configure(&s.discord);
     media::set_enabled(&app, s.media_keys);
@@ -1018,6 +1026,84 @@ fn set_settings(app: AppHandle, settings: Settings, state: State<AppState>) -> R
             }
         }
     }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Обновления Tune
+// ---------------------------------------------------------------------------
+
+fn update_event(detail: &Value) -> String {
+    format!("window.dispatchEvent(new CustomEvent('tune:update',{{detail:{detail}}}))")
+}
+
+fn available(rel: &update::Release) -> Value {
+    json!({ "state": "available", "release": rel, "current": env!("CARGO_PKG_VERSION") })
+}
+
+/// Событие обновления — в страницу музыки (карточка) и в окно настроек.
+fn report_update(app: &AppHandle, detail: Value) {
+    eval_client(app, &update_event(&detail));
+    let _ = app.emit_to("manager", "update", detail);
+}
+
+/// Проверка при запуске: о новой версии спрашиваем в окне музыки, если её не пропускали.
+fn start_update_check(app: &AppHandle) {
+    if !app.state::<AppState>().settings().auto_update {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        // Не мешаем запуску: интерфейс и звук важнее.
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        let Ok(Some(rel)) = update::check() else { return };
+        let state = app.state::<AppState>();
+        if state.settings().skipped_update == rel.version {
+            return;
+        }
+        *state.update.lock().unwrap() = Some(rel.clone());
+        report_update(&app, available(&rel));
+    });
+}
+
+/// Кнопка «Проверить» в настройках: показывает и пропущенную версию.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<Option<update::Release>, String> {
+    let rel = tauri::async_runtime::spawn_blocking(update::check).await.map_err(|e| e.to_string())??;
+    *app.state::<AppState>().update.lock().unwrap() = rel.clone();
+    Ok(rel)
+}
+
+/// Скачивает и ставит найденное обновление, затем Tune перезапускается уже новым.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    let rel = app.state::<AppState>().update.lock().unwrap().clone().ok_or("Обновление не найдено — проверьте ещё раз")?;
+    let handle = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        update::install(&rel, |loaded, total| report_update(&handle, json!({ "state": "progress", "loaded": loaded, "total": total })))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if let Err(e) = result {
+        report_update(&app, json!({ "state": "error", "error": e }));
+        return Err(e);
+    }
+    report_update(&app, json!({ "state": "installing" }));
+    if update::portable() {
+        restart_app(&app);
+    } else {
+        // Установщик сам закроет Tune, если он ещё работает, и запустит новую версию.
+        app.exit(0);
+    }
+    Ok(())
+}
+
+/// «Пропустить»: об этой версии больше не спрашиваем, следующую предложим.
+#[tauri::command]
+fn skip_update(app: AppHandle, version: String, state: State<AppState>) -> Result<(), String> {
+    state.update_settings(|s| s.skipped_update = version)?;
+    *state.update.lock().unwrap() = None;
+    report_update(&app, json!({ "state": "skipped" }));
     Ok(())
 }
 
@@ -1155,6 +1241,7 @@ fn main() {
                 discord,
                 client: Mutex::new(client_state.clone()),
                 page: Mutex::new(PageState::default()),
+                update: Mutex::new(None),
             });
 
             let handle = app.handle();
@@ -1166,6 +1253,8 @@ fn main() {
             create_tray(handle)?;
             media::set_enabled(handle, media_keys);
             mixer::spawn();
+            update::cleanup();
+            start_update_check(handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1200,6 +1289,9 @@ fn main() {
             get_settings,
             app_info,
             set_settings,
+            check_update,
+            install_update,
+            skip_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Tune Music");

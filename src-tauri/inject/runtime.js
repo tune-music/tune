@@ -56,6 +56,9 @@
     .tune-toast.tune-task { width: min(360px, 80vw); }
     .tune-toast.tune-task .tune-toast-body { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 6px; }
     .tune-toast.tune-task img { grid-row: 1 / 3; }
+    .tune-toast.tune-task.tune-nocover .tune-toast-body { grid-template-columns: minmax(0, 1fr) auto; }
+    .tune-toast.tune-task.tune-nocover img { display: none; }
+    .tune-toast.tune-task.tune-nocover .tune-toast-bar { grid-column: 1 / 3; }
     .tune-toast.tune-task .tune-toast-info { opacity: .6; font-variant-numeric: tabular-nums; }
     .tune-toast-bar { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); overflow: hidden; }
     .tune-toast-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--ym-controls-color-primary-text-enabled, #fc3); transition: width .15s linear, background-color .2s; }
@@ -67,6 +70,16 @@
     .tune-toast.tune-task.tune-error .tune-toast-text { white-space: normal; }
     .tune-toast.tune-clickable { cursor: pointer; }
     .tune-toast.tune-clickable:hover { background: rgba(39,39,42,.97); }
+    .tune-toast-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .tune-toast-actions button {
+      padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: transparent; color: inherit;
+      font: inherit; cursor: pointer;
+    }
+    .tune-toast-actions button:hover { background: rgba(255,255,255,.08); }
+    .tune-toast-actions button.tune-primary {
+      background: var(--ym-controls-color-primary-text-enabled, #fc3); border-color: transparent; color: #000; font-weight: 600;
+    }
+    .tune-toast-actions button.tune-primary:hover { filter: brightness(1.08); }
   `);
 
   // -------------------------------------------------------------------------
@@ -469,6 +482,7 @@
     card.addEventListener('click', () => onClick && onClick());
     let timer = 0;
     const handle = {
+      el: card,
       set(o) {
         if ('text' in o) body.querySelector('.tune-toast-text').textContent = o.text || '';
         if ('info' in o) body.querySelector('.tune-toast-info').textContent = o.info || '';

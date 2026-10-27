@@ -901,6 +901,59 @@ async function loadSettings() {
 }
 
 // ---------------------------------------------------------------------------
+// Обновления Tune
+// ---------------------------------------------------------------------------
+
+let updateFound = null;
+// Первая строка описания релиза — коротко о том, что нового.
+const releaseLine = (r) => (r.notes || '').split(/\r?\n/)[0].replace(/^#+\s*/, '') || 'Новая версия готова к установке.';
+const updateBtn = $('#update-check');
+function showUpdate(title, desc, button) {
+  $('#update-title').textContent = title;
+  $('#update-desc').textContent = desc;
+  updateBtn.textContent = button;
+  updateBtn.classList.toggle('btn-primary', !!updateFound);
+  updateBtn.classList.toggle('btn-ghost', !updateFound);
+}
+updateBtn.addEventListener('click', async () => {
+  updateBtn.disabled = true;
+  try {
+    if (updateFound) {
+      showUpdate(`Tune ${updateFound.version}`, 'Скачивание…', 'Обновить');
+      await invoke('install_update');
+      return;
+    }
+    $('#update-desc').textContent = 'Проверка…';
+    updateFound = await invoke('check_update');
+    if (updateFound) showUpdate(`Вышел Tune ${updateFound.version}`, releaseLine(updateFound), 'Обновить');
+    else showUpdate('Версия Tune', 'У вас последняя версия.', 'Проверить');
+  } catch (err) {
+    fail(err);
+    $('#update-desc').textContent = 'Не удалось проверить.';
+  } finally {
+    updateBtn.disabled = false;
+  }
+});
+listen('update', (e) => {
+  const ev = e.payload || {};
+  if (ev.state === 'available') {
+    updateFound = ev.release;
+    showUpdate(`Вышел Tune ${updateFound.version}`, releaseLine(updateFound), 'Обновить');
+  } else if (ev.state === 'progress') {
+    updateBtn.disabled = true;
+    if (ev.total > 0) $('#update-desc').textContent = `Скачивание… ${Math.floor((ev.loaded / ev.total) * 100)} %`;
+  } else if (ev.state === 'installing') {
+    $('#update-desc').textContent = 'Установка — Tune перезапустится.';
+  } else if (ev.state === 'error') {
+    updateBtn.disabled = false;
+    $('#update-desc').textContent = ev.error || 'Не удалось обновить.';
+  } else if (ev.state === 'skipped') {
+    updateFound = null;
+    showUpdate('Версия Tune', 'Эту версию пропустили — её можно поставить, нажав «Проверить».', 'Проверить');
+  }
+});
+
+// ---------------------------------------------------------------------------
 
 loadInstalled().catch(fail);
 loadSettings().catch(fail);

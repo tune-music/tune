@@ -487,6 +487,57 @@
   });
 
   // ---------------------------------------------------------------------------
+  // Обновление Tune: при запуске Tune находит новую версию и спрашивает здесь —
+  // «Обновить» скачивает и ставит её сам, «Пропустить» больше не спрашивает о ней.
+  // ---------------------------------------------------------------------------
+  let updateCard = null;
+  const updateButtons = (release) => {
+    const row = document.createElement('div');
+    row.className = 'tune-toast-actions';
+    const skip = document.createElement('button');
+    skip.textContent = 'Пропустить';
+    skip.onclick = () => {
+      T.invoke('skip_update', { version: release.version }).catch((err) => T.toast(String(err), { error: true }));
+    };
+    const go = document.createElement('button');
+    go.className = 'tune-primary';
+    go.textContent = 'Обновить';
+    go.onclick = () => {
+      row.remove();
+      updateCard.set({ text: `Скачивание Tune ${release.version}`, info: '', progress: null, error: false });
+      // Ошибка придёт и событием tune:update.
+      T.invoke('install_update').catch(() => {});
+    };
+    row.append(skip, go);
+    return row;
+  };
+  window.addEventListener('tune:update', (e) => {
+    const ev = e.detail || {};
+    if (ev.state === 'available') {
+      if (updateCard && updateCard.el.isConnected) return;
+      const r = ev.release;
+      updateCard = T.task({ text: `Вышел Tune ${r.version}`, info: ev.current ? `у вас ${ev.current}` : '', progress: undefined, title: r.notes || '' });
+      updateCard.el.classList.add('tune-nocover');
+      updateCard.el.appendChild(updateButtons(r));
+      return;
+    }
+    if (!updateCard) return;
+    if (ev.state === 'skipped') {
+      updateCard.close();
+      updateCard = null;
+    } else if (ev.state === 'progress') {
+      const known = ev.total > 0;
+      updateCard.set({ progress: known ? ev.loaded / ev.total : null, info: known ? `${Math.floor((ev.loaded / ev.total) * 100)} %` : fmtMb(ev.loaded || 0) });
+    } else if (ev.state === 'installing') {
+      updateCard.set({ ok: true, progress: 1, text: 'Установка — Tune перезапустится', info: '' });
+    } else if (ev.state === 'error') {
+      updateCard.set({ error: true, progress: undefined, text: ev.error || 'Не удалось обновить Tune', info: '' });
+      updateCard.close(8000);
+      updateCard = null;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
   // Без цензуры — по открытым данным FckCensor (github.com/Hazzz895/FckCensorData):
   // для треков из списка ответ get-file-info подменяется ссылкой на версию без цензуры.
   // Плеер Яндекса сам качает и играет её, как обычный файл (mp3, transport=raw).
@@ -713,6 +764,164 @@
       await Promise.race([cfgLoaded, new Promise((r) => setTimeout(r, 4000))]);
       return cfg.uncensor ? patchFileInfo(resp).catch(() => resp) : resp;
     });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Последний трек после перезапуска. Очередь и трек клиент Яндекса восстанавливает
+  // из ответа Ynison на своё первое сообщение (update_full_state). Если Ynison
+  // отвечает ошибкой (у части аккаунтов — 503 «temporary unavailable» с запретом
+  // переподключаться час), восстанавливать нечего и плеер пустой. Tune сам запоминает
+  // очередь и трек из плеера и при такой ошибке подставляет перед ней ответ в формате
+  // Ynison — клиент применяет его своим обычным путём, на паузе.
+  // ---------------------------------------------------------------------------
+  const YNISON_KEY = 'tune:last-queue';
+  const NativeWebSocket = window.WebSocket;
+  let ynisonAnswered = false; // Ynison прислал своё состояние — подменять нечего
+  let ynisonRestored = false;
+  const ENTITY_TYPES = { album: 'ALBUM', playlist: 'PLAYLIST', artist: 'ARTIST' };
+  // Состояние плеера в виде player_state Ynison — так же его собирает сам клиент.
+  const playerStateNow = () => {
+    const s = ym.state();
+    const qs = s && s.queueState;
+    const list = qs && qs.entityList && qs.entityList.value;
+    const cur = qs && qs.currentEntity && qs.currentEntity.value;
+    if (!Array.isArray(list) || !list.length || !cur) return null;
+    const ctx = s.currentContext && s.currentContext.value && s.currentContext.value.data;
+    const from = (ctx && ctx.from) || '';
+    const playables = [];
+    let index = -1;
+    for (const item of list) {
+      const data = item && item.entity && item.entity.data;
+      const meta = data && data.meta;
+      if (!meta || meta.id == null || meta.id === '') continue;
+      if (item === cur || item.entity === cur.entity) index = playables.length;
+      const album = (meta.albums || [])[0];
+      playables.push({
+        playable_id: String(meta.id),
+        album_id_optional: album && album.id != null ? String(album.id) : meta.albumId != null ? String(meta.albumId) : null,
+        playable_type: 'TRACK',
+        from,
+        title: meta.title || '',
+        cover_url_optional: meta.coverUri || null,
+      });
+    }
+    if (index < 0) {
+      const curId = cur.entity && cur.entity.data && cur.entity.data.meta && String(cur.entity.data.meta.id);
+      index = playables.findIndex((p) => p.playable_id === curId);
+    }
+    if (index < 0) return null;
+    // Альбом, плейлист и исполнитель восстанавливаются целиком; остальное (волна,
+    // подборки) — набором треков из очереди.
+    let entityType = 'VARIOUS';
+    let entityId = '';
+    const cmeta = ctx && ctx.meta;
+    if (ctx && ENTITY_TYPES[ctx.type] && cmeta) {
+      const id = ctx.type === 'playlist' && cmeta.uid != null && cmeta.kind != null ? `${cmeta.uid}:${cmeta.kind}` : String(cmeta.id ?? '');
+      if (id && (ctx.type !== 'playlist' || id.includes(':'))) {
+        entityType = ENTITY_TYPES[ctx.type];
+        entityId = id;
+      }
+    }
+    const prog = ym.progress() || {};
+    const now = Date.now();
+    const version = { device_id: 'tune', version: 0, timestamp_ms: now };
+    return {
+      player_queue: {
+        current_playable_index: index,
+        entity_id: entityId,
+        entity_type: entityType,
+        playable_list: playables,
+        options: { repeat_mode: 'NONE' },
+        shuffle_optional: null,
+        entity_context: 'BASED_ON_ENTITY_BY_DEFAULT',
+        version,
+        from_optional: from,
+        initial_entity_optional: null,
+        adding_options_optional: null,
+        queue: null,
+      },
+      status: {
+        duration_ms: Math.round((prog.duration || 0) * 1000),
+        paused: true,
+        playback_speed: 1,
+        progress_ms: Math.round((prog.position || 0) * 1000),
+        version,
+      },
+    };
+  };
+  const saveQueue = () => {
+    const ps = playerStateNow();
+    if (!ps) return;
+    try {
+      localStorage.setItem(YNISON_KEY, JSON.stringify(ps));
+    } catch (e) {}
+  };
+  // Трек сменился — сразу; позиция — раз в 10 секунд, пока играет (и раз после паузы),
+  // и при закрытии.
+  T.onTrack(saveQueue);
+  let queueWasPlaying = false;
+  setInterval(() => {
+    const playing = player.isPlaying();
+    if (playing || queueWasPlaying) saveQueue();
+    queueWasPlaying = playing;
+  }, 10000);
+  window.addEventListener('pagehide', saveQueue);
+  const watchYnison = (ws) => {
+    let fullRid = null;
+    let device = null;
+    ws.send = function (data) {
+      try {
+        const msg = JSON.parse(data);
+        if (msg.update_full_state) {
+          fullRid = msg.rid;
+          device = msg.update_full_state.device;
+        }
+      } catch (e) {}
+      return NativeWebSocket.prototype.send.call(this, data);
+    };
+    const ours = new WeakSet();
+    const emit = (data) => {
+      const ev = new MessageEvent('message', { data });
+      ours.add(ev);
+      ws.dispatchEvent(ev);
+    };
+    // Слушатель из конструктора стоит первым — раньше onmessage и слушателей клиента.
+    ws.addEventListener('message', (e) => {
+      if (ours.has(e) || typeof e.data !== 'string') return;
+      let msg;
+      try {
+        msg = JSON.parse(e.data);
+      } catch (err) {
+        return;
+      }
+      if (!msg.error) {
+        if (msg.player_state) ynisonAnswered = true;
+        return;
+      }
+      if (cfg.keepTrack === false || ynisonAnswered || ynisonRestored || !fullRid || !device) return;
+      let state = null;
+      try {
+        state = JSON.parse(localStorage.getItem(YNISON_KEY) || 'null');
+      } catch (err) {}
+      if (!state || !state.player_queue || !state.status) return;
+      ynisonRestored = true;
+      e.stopImmediatePropagation();
+      const now = Date.now();
+      const deviceId = device.info && device.info.device_id;
+      // Версии новее начального пустого состояния клиента (timestamp_ms 0), иначе он
+      // сочтёт их устаревшими и не применит.
+      const version = { device_id: deviceId, version: Math.floor(Math.random() * 1e15), timestamp_ms: now };
+      state.player_queue.version = version;
+      state.status = { ...state.status, paused: true, version };
+      emit(JSON.stringify({ player_state: state, devices: [device], active_device_id_optional: deviceId, timestamp_ms: now, rid: fullRid }));
+      emit(e.data);
+    });
+  };
+  window.WebSocket = class extends NativeWebSocket {
+    constructor(url, protocols) {
+      super(url, protocols);
+      if (/\/ynison_state\.YnisonStateService\/PutYnisonState/.test(String(url))) watchYnison(this);
+    }
   };
 
   // ---------------------------------------------------------------------------

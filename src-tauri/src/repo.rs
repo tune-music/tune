@@ -36,7 +36,7 @@ const SINGLES: &[(&str, &str, bool)] = &[
     ("PulseSync-LLC/BetterPlayer-addon", "BetterPlayer", false),
 ];
 const CACHE_TTL: u64 = 6 * 3600;
-const UA: &str = concat!("TuneMusic/", env!("CARGO_PKG_VERSION"), " (+https://github.com/tune-music/tune)");
+pub const UA: &str = concat!("TuneMusic/", env!("CARGO_PKG_VERSION"), " (+https://github.com/tune-music/tune)");
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -102,7 +102,7 @@ pub fn get_bytes(url: &str) -> Result<Vec<u8>, String> {
     resp.body_mut().with_config().limit(200 * 1024 * 1024).read_to_vec().map_err(|e| e.to_string())
 }
 
-fn get_json(url: &str) -> Result<Value, String> {
+pub fn get_json(url: &str) -> Result<Value, String> {
     serde_json::from_str(&get_text(url)?).map_err(|e| e.to_string())
 }
 

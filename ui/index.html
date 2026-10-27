@@ -171,6 +171,10 @@
             <h2>Треки</h2>
             <div class="card">
               <div class="row">
+                <div class="row-text"><div class="row-title">Помнить последний трек</div><div class="row-desc">После перезапуска в плеере остаётся трек, который играл, и его очередь — даже если сервер синхронизации Яндекса (Ynison) их не вернул.</div></div>
+                <input type="checkbox" class="switch" data-key="features.keepTrack" />
+              </div>
+              <div class="row">
                 <div class="row-text"><div class="row-title">Без цензуры</div><div class="row-desc">Треки, у которых в Яндексе запикана или вырезана часть, играют в оригинальной версии — по открытому списку <a href="#" data-link="https://github.com/Hazzz895/FckCensorData">FckCensor</a>, он обновляется сам. У таких треков стоит значок замка.</div></div>
                 <input type="checkbox" class="switch" data-key="features.uncensor" />
               </div>
@@ -358,6 +362,18 @@
               <div class="row">
                 <div class="row-text"><div class="row-title">Папка данных</div><div class="row-desc" id="about-data"></div></div>
                 <button class="btn btn-ghost" id="open-data">Открыть</button>
+              </div>
+            </div>
+
+            <h2>Обновления</h2>
+            <div class="card">
+              <div class="row">
+                <div class="row-text"><div class="row-title">Проверять обновления при запуске</div><div class="row-desc">Если вышла новая версия, в окне музыки появится предложение обновиться: «Обновить» скачает и установит её сама, Tune перезапустится.</div></div>
+                <input type="checkbox" class="switch" data-key="autoUpdate" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title" id="update-title">Версия Tune</div><div class="row-desc" id="update-desc">Проверить, не вышла ли новая.</div></div>
+                <button class="btn btn-ghost" id="update-check">Проверить</button>
               </div>
             </div>
           </div>

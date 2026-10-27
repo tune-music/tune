@@ -94,6 +94,8 @@ pub struct Features {
     pub download_button: bool,
     /// Версии треков без цензуры из открытого списка FckCensor.
     pub uncensor: bool,
+    /// Помнить последний трек и очередь, если Ynison не отдал их при запуске.
+    pub keep_track: bool,
 }
 
 impl Default for Features {
@@ -114,6 +116,7 @@ impl Default for Features {
             download: true,
             download_button: false,
             uncensor: true,
+            keep_track: true,
         }
     }
 }
@@ -132,6 +135,10 @@ pub struct Settings {
     pub start_minimized: bool,
     /// Масштаб интерфейса музыки, 1.0 — 100 %.
     pub zoom: f64,
+    /// Проверять обновления Tune при запуске.
+    pub auto_update: bool,
+    /// Версия, которую пользователь пропустил: о ней больше не спрашиваем.
+    pub skipped_update: String,
     /// Идентификаторы устройства для интерфейса Яндекса (как у официального клиента).
     pub device_uuid: String,
     pub device_id: String,
@@ -149,6 +156,8 @@ impl Default for Settings {
             autostart: false,
             start_minimized: false,
             zoom: 1.0,
+            auto_update: true,
+            skipped_update: String::new(),
             device_uuid: String::new(),
             device_id: String::new(),
         }
