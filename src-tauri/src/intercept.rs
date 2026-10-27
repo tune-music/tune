@@ -216,16 +216,27 @@ pub fn app_like(_win: &tauri::WebviewWindow, _keep_accelerators: bool) {}
 pub fn set_page_visible(win: &tauri::WebviewWindow, visible: bool) {
     use webview2_com::Microsoft::Web::WebView2::Win32::*;
     use windows::core::Interface;
+    crate::occlusion::forget();
+    set_drawing(win, visible);
     let _ = win.with_webview(move |pw| unsafe {
-        let controller = pw.controller();
-        let _ = controller.SetIsVisible(visible);
-        let Ok(core) = controller.CoreWebView2() else { return };
+        let Ok(core) = pw.controller().CoreWebView2() else { return };
         if let Ok(c19) = core.cast::<ICoreWebView2_19>() {
             let level = if visible { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL } else { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW };
             let _ = c19.SetMemoryUsageTargetLevel(level);
         }
     });
 }
+
+/// Только рисование, без памяти: окно закрыто другими и может открыться в любой момент.
+#[cfg(windows)]
+pub fn set_drawing(win: &tauri::WebviewWindow, on: bool) {
+    let _ = win.with_webview(move |pw| unsafe {
+        let _ = pw.controller().SetIsVisible(on);
+    });
+}
+
+#[cfg(not(windows))]
+pub fn set_drawing(_win: &tauri::WebviewWindow, _on: bool) {}
 
 #[cfg(not(windows))]
 pub fn set_page_visible(_win: &tauri::WebviewWindow, _visible: bool) {}

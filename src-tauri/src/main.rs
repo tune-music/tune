@@ -9,6 +9,7 @@ mod download;
 mod intercept;
 mod media;
 mod mixer;
+mod occlusion;
 mod proxy;
 mod repo;
 mod store;
@@ -362,6 +363,9 @@ fn create_main(app: &AppHandle, visible: bool) -> tauri::Result<()> {
         })
         .build()?;
     intercept::app_like(&win, debug_mode());
+    if let Ok(hwnd) = win.hwnd() {
+        occlusion::watch(app, hwnd.0 as isize);
+    }
     let zoom = state.settings().zoom;
     if (zoom - 1.0).abs() > 0.001 {
         let _ = win.set_zoom(zoom);
@@ -609,8 +613,13 @@ fn set_autostart(on: bool) -> Result<(), String> {
 
 #[tauri::command]
 fn page_ready(window: WebviewWindow, state: State<AppState>, loaded: Option<bool>) {
-    let hidden = window.label() == "main" && (!window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false));
+    if window.label() == "main" {
+        occlusion::set_loaded(loaded == Some(true));
+    }
+    let hidden = window.label() == "main"
+        && (!window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false) || occlusion::hidden());
     // Интерфейс Яндекса догрузился — окно в трее или свёрнуто, кадры больше не нужны.
+    // Закрытое другими окно спрячет occlusion сам.
     if loaded == Some(true) {
         if hidden {
             intercept::set_page_visible(&window, false);
