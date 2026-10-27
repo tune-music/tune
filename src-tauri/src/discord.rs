@@ -219,6 +219,12 @@ fn build_activity(t: &Track, cfg: &DiscordSettings) -> activity::Activity<'stati
         act = act.state_url(u);
     }
 
+    // Подпись латиницей: Discord считает лимит кнопки (32) в байтах и с длинной
+    // русской подписью не показывает кнопки вовсе.
+    if cfg.site_button {
+        act = act.buttons(vec![activity::Button::new("Tune Music", TUNE_SITE)]);
+    }
+
     if cfg.show_progress && t.playing && t.duration > 0.0 {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
         let start = now - (t.position * 1000.0) as i64;
@@ -254,7 +260,8 @@ mod tests {
         let json = serde_json::to_value(build_activity(&track(), &cfg)).unwrap();
         assert_eq!(json["details_url"], "https://music.yandex.ru/album/1/track/2");
         assert_eq!(json["assets"]["large_url"], "https://example.com/cover");
-        assert!(json.get("buttons").is_none());
+        assert_eq!(json["buttons"][0]["label"], "Tune Music");
+        assert_eq!(json["buttons"][0]["url"], TUNE_SITE);
         // По умолчанию обложка ведёт на трек, значок — никуда.
         let json = serde_json::to_value(build_activity(&track(), &DiscordSettings::default())).unwrap();
         assert_eq!(json["assets"]["large_url"], "https://music.yandex.ru/album/1/track/2");

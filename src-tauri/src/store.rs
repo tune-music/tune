@@ -23,6 +23,8 @@ pub struct DiscordSettings {
     pub cover_url: String,
     pub icon_link: String,
     pub icon_link_url: String,
+    /// Кнопка «Tune Music» со ссылкой на сайт Tune.
+    pub site_button: bool,
     pub show_cover: bool,
     pub show_progress: bool,
     /// На паузе: true — показывать «Пауза», false — убирать статус.
@@ -48,6 +50,7 @@ impl Default for DiscordSettings {
             cover_url: String::new(),
             icon_link: "tune".into(),
             icon_link_url: String::new(),
+            site_button: true,
             show_cover: true,
             show_progress: true,
             show_paused: false,
