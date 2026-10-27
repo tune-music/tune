@@ -257,6 +257,7 @@ fn show_window(win: &WebviewWindow) {
     let _ = win.unminimize();
     let _ = win.show();
     let _ = win.set_focus();
+    intercept::set_page_visible(win, true);
 }
 
 fn show_main(app: &AppHandle) {
@@ -377,17 +378,28 @@ fn create_main(app: &AppHandle, visible: bool) -> tauri::Result<()> {
     }
 
     let handle = app.clone();
-    win.on_window_event(move |event| {
-        if let WindowEvent::CloseRequested { api, .. } = event {
+    let minimized = std::sync::atomic::AtomicBool::new(false);
+    win.on_window_event(move |event| match event {
+        WindowEvent::CloseRequested { api, .. } => {
             if handle.state::<AppState>().settings().close_to_tray {
                 api.prevent_close();
                 if let Some(w) = handle.get_webview_window("main") {
                     let _ = w.hide();
+                    intercept::set_page_visible(&w, false);
                 }
             } else {
                 handle.exit(0);
             }
         }
+        // Свернули или развернули (кнопкой, с панели задач, Win+D) — WebView2 узнаёт об этом от нас.
+        WindowEvent::Resized(_) => {
+            let Some(w) = handle.get_webview_window("main") else { return };
+            let now = w.is_minimized().unwrap_or(false);
+            if minimized.swap(now, std::sync::atomic::Ordering::Relaxed) != now {
+                intercept::set_page_visible(&w, !now);
+            }
+        }
+        _ => {}
     });
     Ok(())
 }
@@ -596,7 +608,20 @@ fn set_autostart(on: bool) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-fn page_ready(window: WebviewWindow, state: State<AppState>) {
+fn page_ready(window: WebviewWindow, state: State<AppState>, loaded: Option<bool>) {
+    let hidden = window.label() == "main" && (!window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false));
+    // Интерфейс Яндекса догрузился — окно в трее или свёрнуто, кадры больше не нужны.
+    if loaded == Some(true) {
+        if hidden {
+            intercept::set_page_visible(&window, false);
+        }
+        return;
+    }
+    // Страница начала грузиться (запуск в трей, перезагрузка), а без кадров интерфейс
+    // Яндекса не дорисуется и плеер не появится — до загрузки WebView2 видимый.
+    if hidden {
+        intercept::set_page_visible(&window, true);
+    }
     push_payload(&window, &state);
 }
 

@@ -517,7 +517,9 @@
     return map;
   };
   const fetchUncensor = async () => {
-    const r = await origFetch(UNCENSOR_LIST, { cache: 'no-store' });
+    // no-cache, а не no-store: браузер переспрашивает с ETag, и неизменный список приходит
+    // ответом 304 без тела.
+    const r = await origFetch(UNCENSOR_LIST, { cache: 'no-cache' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const list = await r.json();
     try {
@@ -747,7 +749,9 @@
     speedWasOn = true;
     guardSpeed();
     if (Math.abs((player.speed() || 1) - speed) > 0.001) player.speed(speed);
-    document.querySelectorAll('.tune-speed-label').forEach((l) => (l.textContent = fmtSpeed(speed)));
+    // Запись того же текста всё равно меняет DOM и будит наблюдателей страницы.
+    const label = fmtSpeed(speed);
+    document.querySelectorAll('.tune-speed-label').forEach((l) => l.textContent !== label && (l.textContent = label));
   };
   // Шаг скорости — из настроек (0,05 / 0,1 / 0,25). Клик идёт по кругу от 0,5× до 2×,
   // колесо над кнопкой упирается в края, 0 — сброс на 1×.
@@ -1204,8 +1208,16 @@
     return player.isPlaying() ? lastPos + Math.min(1.5, (now - lastAt) / 1000) * (player.speed() || 1) : lastPos;
   };
 
+  // Кадры крутятся, только пока окно текста открыто: пустой цикл requestAnimationFrame
+  // заставляет WebView2 готовить каждый кадр монитора и при закрытом окне.
+  let frameId = 0;
+  const startFrames = () => {
+    if (!frameId) frameId = requestAnimationFrame(frame);
+  };
   const frame = () => {
-    if (lyricsOpen && panel) {
+    frameId = 0;
+    if (!lyricsOpen) return;
+    if (panel) {
       const playing = !!player.isPlaying();
       if (panel.classList.contains('tune-playing') !== playing) panel.classList.toggle('tune-playing', playing);
     }
@@ -1231,9 +1243,8 @@
         }
       }
     }
-    requestAnimationFrame(frame);
+    startFrames();
   };
-  requestAnimationFrame(frame);
 
   // Окно встаёт в область контента и, если включена тема, берёт у неё фон, размытие,
   // рамку, скругление и цвет текста — темы перекрашивают именно эту область.
@@ -1421,6 +1432,7 @@
       }
       render();
       popupsSeen = new Set(openPopups());
+      startFrames();
     }
     markFs();
     mountPlayerButtons();
@@ -1475,7 +1487,6 @@
     }
     mountPlayerButtons();
     applySpeed();
-    applyAudioFx();
     if (cfg.uncensor) loadUncensor();
     mountUncensorBadges();
   };
@@ -1484,9 +1495,13 @@
     cfgReady();
     if (cfg.uncensor) loadUncensor();
     apply();
+    // Реверб и тон зависят только от настроек: новые узлы и плееры получают их сами.
+    applyAudioFx();
   });
+  // Окно свёрнуто или спрятано в трей — страницу никто не видит, проверки подождут.
   setInterval(() => {
-    if (!document.body) return;
+    if (!document.body || document.hidden) return;
     apply();
   }, 1000);
+  document.addEventListener('visibilitychange', () => document.body && !document.hidden && apply());
 })();

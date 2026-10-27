@@ -719,9 +719,16 @@
     }).observe(document.body, { childList: true, subtree: true });
     mountButton();
     setInterval(tick, 1000);
+    // Интерфейс загрузился (заставка ушла, кнопка Tune в сайдбаре) — в трее Tune
+    // после этого перестаёт рисовать страницу.
+    let loadedSent = false;
     setInterval(() => {
       mountButton();
       flushQueue();
+      if (!loadedSent && document.getElementById('tune-nav-item')) {
+        loadedSent = true;
+        invoke('page_ready', { loaded: true }).catch(() => {});
+      }
     }, 500);
     window.addEventListener('load', flushQueue);
     invoke('page_ready').catch((e) => console.error('[tune] page_ready', e));
