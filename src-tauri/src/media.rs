@@ -5,7 +5,7 @@
 //! регистрирует наше окно: в панели громкости видно «Tune Music», трек и обложку,
 //! а медиаклавиши приходят сюда без глобального перехвата клавиатуры.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
@@ -17,6 +17,8 @@ thread_local! {
     // Объекты SMTC привязаны к главному потоку, поэтому живут в thread_local
     // и трогаются только через run_on_main_thread.
     static CONTROLS: RefCell<Option<MediaControls>> = const { RefCell::new(None) };
+    // Включена ли медиапанель в настройках; сама сессия создаётся, когда появится трек.
+    static ENABLED: Cell<bool> = const { Cell::new(false) };
 }
 
 fn on_event(app: &AppHandle, event: MediaControlEvent) {
@@ -62,30 +64,31 @@ fn create(app: &AppHandle) -> Option<MediaControls> {
     Some(controls)
 }
 
-/// Включает или убирает нашу сессию из системной медиапанели.
+/// Включает или убирает нашу сессию из системной медиапанели (она появится с первым треком).
 pub fn set_enabled(app: &AppHandle, enabled: bool) {
-    let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
-        CONTROLS.with(|c| {
-            let mut c = c.borrow_mut();
-            if enabled && c.is_none() {
-                *c = create(&handle);
-            } else if !enabled {
-                *c = None;
-            }
-        });
+        ENABLED.with(|e| e.set(enabled));
+        if !enabled {
+            CONTROLS.with(|c| *c.borrow_mut() = None);
+        }
     });
 }
 
 pub fn update(app: &AppHandle, track: Option<Track>) {
+    let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         CONTROLS.with(|c| {
             let mut c = c.borrow_mut();
-            let Some(controls) = c.as_mut() else { return };
+            // Нет трека — сессии в медиапанели нет вовсе: пустая сессия показывала бы
+            // вместо названия идентификатор приложения (dev.tune.music).
             let Some(t) = track.filter(|t| !t.title.is_empty()) else {
-                let _ = controls.set_playback(MediaPlayback::Stopped);
+                *c = None;
                 return;
             };
+            if c.is_none() && ENABLED.with(|e| e.get()) {
+                *c = create(&handle);
+            }
+            let Some(controls) = c.as_mut() else { return };
             let _ = controls.set_metadata(MediaMetadata {
                 title: Some(&t.title),
                 artist: Some(&t.artist).filter(|s| !s.is_empty()).map(|s| s.as_str()),

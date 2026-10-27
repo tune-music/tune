@@ -640,8 +640,12 @@ fn page_window(window: WebviewWindow, action: String) {
 
 /// Cookie Яндекса, которые интерфейсу нужны для входа. Сессионные cookie
 /// странице (и плагинам) не отдаются — только логин и yandexuid.
+///
+/// Только async: синхронная команда выполняется внутри обработчика запроса WebView2,
+/// а cookies_for_url ждёт ответа от того же WebView2 — главный поток зависал навсегда
+/// (интерфейс не догружался, вход и меню трея переставали работать).
 #[tauri::command]
-fn page_cookie(window: WebviewWindow, name: String) -> Option<String> {
+async fn page_cookie(window: WebviewWindow, name: String) -> Option<String> {
     if !matches!(name.as_str(), "yandex_login" | "yandexuid") {
         return None;
     }
