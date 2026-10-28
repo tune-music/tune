@@ -227,7 +227,9 @@
         ours.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          toggleLyrics();
+          // В полноэкранном плеере текст открывается во весь экран, а не мини-окном.
+          if (ours.closest('[data-test-id="FULLSCREEN_PLAYER_MODAL"]')) toggleFullLyrics();
+          else toggleLyrics();
         });
         native.parentElement.insertBefore(ours, native);
       }
@@ -253,6 +255,12 @@
     if (btn.title !== title) btn.title = title;
     btn.classList.toggle('tune-on', lyricsOpen && !off);
   };
+  // Кнопка «Текст» в полноэкранном плеере: текст во весь экран или убрать его.
+  const toggleFullLyrics = () => {
+    if (lyricsOpen && lyricsFull) return toggleLyrics(false);
+    if (!lyricsOpen) toggleLyrics(true);
+    toggleFull(true);
+  };
   const mountFullscreenLyrics = () => {
     const show = cfg.lyrics;
     for (const root of document.querySelectorAll('[class*="FullscreenPlayerDesktopControls_root"]')) {
@@ -273,9 +281,7 @@
         ours.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (lyricsOpen && lyricsFull) return toggleLyrics(false);
-          if (!lyricsOpen) toggleLyrics(true);
-          toggleFull(true);
+          toggleFullLyrics();
         });
         root.appendChild(ours);
       }
@@ -1212,6 +1218,8 @@
   let yandexQueue = Promise.resolve();
   const yandexLyrics = (meta) => {
     const run = async () => {
+      // Сразу после запуска интерфейс ещё собирается и хранилища нет — ждём его до 10 секунд.
+      for (let i = 0; i < 40 && !fsStore(); i++) await new Promise((r) => setTimeout(r, 250));
       const sync = fsStore() && fsStore().syncLyrics;
       if (!sync || typeof sync.getData !== 'function') return null;
       await sync.getData(meta.id);
@@ -1719,6 +1727,8 @@
       refreshLyrics();
       prefetchNext();
     }
+    // Размер шрифта и прочее видно сразу, пока двигают ползунок в настройках.
+    if (lyricsOpen) render();
     mountPlayerButtons();
     applySpeed();
     if (cfg.uncensor) loadUncensor();
