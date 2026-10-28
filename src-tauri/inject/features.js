@@ -198,14 +198,14 @@
     return native.className;
   };
 
-  // Кнопка текста — копия родной кнопки Яндекса «Текст» (та выключена, когда у Яндекса
-  // текста нет). Появляется, только если текст нашёлся в LRCLIB.
+  // Кнопка текста — копия родной кнопки Яндекса «Текст»: открывает окно текста Tune,
+  // а не страницу Яндекса. Появляется, когда текст нашёлся — у Яндекса или в LRCLIB.
   const mountLyricsButtons = () => {
     const show = cfg.lyrics && lyricsAvailable;
     for (const native of document.querySelectorAll('[data-test-id$="SYNC_LYRICS_BUTTON"]:not([data-tune])')) {
       const prev = native.previousElementSibling;
       let ours = prev && prev.dataset.tune === 'lyrics' ? prev : null;
-      const replace = show && (native.disabled || cfg.lyricsAlways);
+      const replace = show;
       if (!replace) {
         if (ours) ours.remove();
         if (native.dataset.tuneHidden) {
@@ -1164,11 +1164,9 @@
   const cache = new Map();
 
   let lyricsAvailable = false;
-  const yandexHasSync = () => {
-    const m = ym.meta();
-    return !!(m && m.lyricsInfo && m.lyricsInfo.hasAvailableSyncLyrics);
-  };
-  const lyricsWanted = () => cfg.lyrics && !!ym.meta() && (cfg.lyricsAlways || !yandexHasSync());
+  const lyricsWanted = () => cfg.lyrics && !!ym.meta();
+  // Свой синхронный текст Яндекса берём у Яндекса, если не просили искать и для таких треков.
+  const fromYandex = (meta) => !cfg.lyricsAlways && !!(meta && meta.lyricsInfo && meta.lyricsInfo.hasAvailableSyncLyrics);
 
   const parseLrc = (text) => {
     const out = [];
@@ -1204,15 +1202,43 @@
     return hit;
   };
 
+  // Текст Яндекса качает его же хранилище (подпись запроса знает только клиент). Хранилище
+  // одно на все треки, поэтому запросы идут по очереди.
+  const fmtStamp = (sec) => {
+    const m = Math.floor(sec / 60);
+    const rest = (sec - m * 60).toFixed(2).padStart(5, '0');
+    return `[${String(m).padStart(2, '0')}:${rest}]`;
+  };
+  let yandexQueue = Promise.resolve();
+  const yandexLyrics = (meta) => {
+    const run = async () => {
+      const sync = fsStore() && fsStore().syncLyrics;
+      if (!sync || typeof sync.getData !== 'function') return null;
+      await sync.getData(meta.id);
+      if (String(sync.currentTrackId) !== String(meta.id) || !sync.lines || !sync.lines.length) return null;
+      return { syncedLyrics: sync.lines.map((l) => `${fmtStamp(l.fromSec)}${l.text}`).join('\n') };
+    };
+    const job = yandexQueue.then(run, run);
+    yandexQueue = job.catch(() => null);
+    return job;
+  };
+  const findLyrics = async (meta) => {
+    if (fromYandex(meta)) {
+      const hit = await yandexLyrics(meta).catch(() => null);
+      if (hit) return hit;
+    }
+    return lrclib(meta);
+  };
+
   // Один запрос на трек: и текущий, и заранее подгружаемый следующий.
   const lyricsPending = new Map();
   const fetchLyrics = (meta) => {
-    const key = String(meta.id);
+    const key = `${fromYandex(meta) ? 'ym' : 'lrc'}:${meta.id}`;
     if (cache.has(key)) return Promise.resolve(cache.get(key));
     if (!lyricsPending.has(key)) {
       lyricsPending.set(
         key,
-        lrclib(meta)
+        findLyrics(meta)
           .catch(() => null)
           .then((hit) => {
             cache.set(key, hit);
@@ -1242,7 +1268,6 @@
   const prefetchNext = () => {
     const meta = cfg.lyrics && nextMeta();
     if (!meta || !meta.id || !meta.title) return;
-    if (!cfg.lyricsAlways && meta.lyricsInfo && meta.lyricsInfo.hasAvailableSyncLyrics) return;
     fetchLyrics(meta);
   };
 
@@ -1252,7 +1277,7 @@
     const key = String(meta.id);
     if (key === lyricsFor) return;
     lyricsFor = key;
-    let hit = cache.get(key);
+    let hit = cache.get(`${fromYandex(meta) ? 'ym' : 'lrc'}:${key}`);
     if (hit === undefined) {
       lines = [];
       plain = '';
@@ -1700,7 +1725,9 @@
     mountUncensorBadges();
   };
   window.addEventListener('tune:features', (e) => {
+    const wasAlways = cfg.lyricsAlways;
     cfg = e.detail || {};
+    if (wasAlways !== undefined && wasAlways !== cfg.lyricsAlways) lyricsFor = '';
     cfgReady();
     if (cfg.uncensor) loadUncensor();
     apply();

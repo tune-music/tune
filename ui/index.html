@@ -105,12 +105,12 @@
               <div class="row">
                 <div class="row-text">
                   <div class="row-title">Синхронный текст песен</div>
-                  <div class="row-desc">Если у Яндекса текста нет, Tune находит его сам — кнопка «Текст» в плеере снова работает. Строки подсвечиваются по ходу песни, клик по строке перематывает.</div>
+                  <div class="row-desc">Кнопка «Текст» открывает окно текста Tune — сбоку или на весь экран. Текст берётся у Яндекса, а если его нет — из LRCLIB. Строки подсвечиваются по ходу песни, клик по строке перематывает.</div>
                 </div>
                 <input type="checkbox" class="switch" data-key="features.lyrics" />
               </div>
               <div class="row" data-dep="features.lyrics">
-                <div class="row-text"><div class="row-title">Искать и там, где у Яндекса есть свой текст</div></div>
+                <div class="row-text"><div class="row-title">Искать и там, где у Яндекса есть свой текст</div><div class="row-desc">Брать текст из LRCLIB даже для треков с текстом Яндекса. Окно текста от этого не меняется.</div></div>
                 <input type="checkbox" class="switch" data-key="features.lyricsAlways" />
               </div>
               <div class="row" data-dep="features.lyrics">

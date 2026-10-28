@@ -10,6 +10,8 @@ fn main() {
             "page_cookie",
             "page_download",
             "page_reveal_download",
+            "install_update",
+            "skip_update",
             // страница первой загрузки интерфейса
             "client_status",
             "client_retry",
@@ -35,6 +37,7 @@ fn main() {
             "get_settings",
             "app_info",
             "set_settings",
+            "check_update",
         ]),
     ))
     .expect("failed to run tauri-build");

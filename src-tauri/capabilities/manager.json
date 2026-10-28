@@ -29,6 +29,8 @@
     "allow-show-client",
     "allow-get-settings",
     "allow-app-info",
-    "allow-set-settings"
+    "allow-set-settings",
+    "allow-check-update",
+    "allow-install-update"
   ]
 }

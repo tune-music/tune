@@ -24,6 +24,11 @@ const state = {
 // Общее
 // ---------------------------------------------------------------------------
 
+// Без браузерного меню по правой кнопке, как в приложении; в полях ввода оно остаётся — вставить и копировать.
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest('input, textarea, [contenteditable="true"]')) e.preventDefault();
+});
+
 let toastTimer = 0;
 function toast(text, error = false) {
   const el = $('#toast');
@@ -88,10 +93,11 @@ $$('.nav-item').forEach((b) =>
 // Каталог
 // ---------------------------------------------------------------------------
 
-$$('.tab').forEach((t) =>
+// Только вкладки каталога: у вкладок настроек тот же класс .tab, но data-section.
+$$('.tab[data-tab]').forEach((t) =>
   t.addEventListener('click', () => {
     state.tab = t.dataset.tab;
-    $$('.tab').forEach((x) => x.classList.toggle('active', x === t));
+    $$('.tab[data-tab]').forEach((x) => x.classList.toggle('active', x === t));
     $('#refresh-catalog').classList.toggle('hidden', state.tab !== 'browse');
     if (state.tab === 'browse' && !state.catalog && !state.catalogLoading) loadCatalog(false);
     render();
