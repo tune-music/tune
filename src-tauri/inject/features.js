@@ -88,10 +88,15 @@
     [data-tune-fs] [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"] { translate: -25vw 0; }
     /* Очередь или текст Яндекса: обложку сдвигает сам Яндекс (на ту же четверть экрана),
        наш сдвиг не добавляется — иначе она уезжает на полэкрана. */
-    [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"][class*="fullscreenContent_enter"] { translate: 0 0 !important; }
+    [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"][class*="fullscreenContent_enter"] { translate: 0 0; }
     /* Смена нашего текста на очередь и обратно: обложка и там и там на одном месте —
        стоит, а не съезжает в центр и обратно. */
     [data-tune-handoff] [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"] { animation-duration: 0s !important; transition: none !important; }
+    /* …но с лёгким покачиванием, как у переходов Яндекса: обложка и кнопки чуть уходят
+       влево и возвращаются. Качается содержимое блока: анимация самого блока у Яндекса
+       держит его на месте. */
+    [data-tune-handoff] [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"] > * { animation: tune-fs-nudge .7s cubic-bezier(.2,.8,.2,1); }
+    @keyframes tune-fs-nudge { 0%, 100% { translate: 0 0; } 40% { translate: -1.5vw 0; } }
     .tune-ly-head { display: flex; align-items: center; gap: var(--ym-spacer-size-m, 12px); padding: var(--ym-spacer-size-l, 16px); }
     .tune-ly-head img { width: 48px; height: 48px; border-radius: var(--ym-radius-size-m, 8px); object-fit: cover; flex: none; }
     .tune-ly-head img:not([src]), .tune-ly-head img[src=""] { visibility: hidden; }
@@ -1179,7 +1184,11 @@
   let lyricsAvailable = false;
   const lyricsWanted = () => cfg.lyrics && !!ym.meta();
   // Свой синхронный текст Яндекса берём у Яндекса, если не просили искать и для таких треков.
-  const fromYandex = (meta) => !cfg.lyricsAlways && !!(meta && meta.lyricsInfo && meta.lyricsInfo.hasAvailableSyncLyrics);
+  const yandexSync = (meta) => !!(meta && meta.lyricsInfo && meta.lyricsInfo.hasAvailableSyncLyrics);
+  const fromYandex = (meta) => !cfg.lyricsAlways && yandexSync(meta);
+  // Поколение настроек источников: поиск, начатый до их смены, свой ответ не отдаёт.
+  let lyricsGen = 0;
+  const lyricsKey = (meta) => `${lyricsGen}:${fromYandex(meta) ? 'ym' : 'ext'}:${meta.id}`;
 
   // Строки с авторами, которые источники ставят в начало текста: «作词 : …»,
   // «Lyrics by: …», «Текст: …». Это не слова песни.
@@ -1283,13 +1292,19 @@
       if (hit && hit.syncedLyrics) return hit;
       fallback = fallback || hit;
     }
+    // Нигде нет синхронного, а у Яндекса есть — берём его: текст всё равно откроется в окне
+    // Tune, а не на странице Яндекса.
+    if (yandexSync(meta) && !fromYandex(meta)) {
+      const own = await yandexLyrics(meta).catch(() => null);
+      if (own) return own;
+    }
     return fallback;
   };
 
   // Один запрос на трек: и текущий, и заранее подгружаемый следующий.
   const lyricsPending = new Map();
   const fetchLyrics = (meta) => {
-    const key = `${fromYandex(meta) ? 'ym' : 'lrc'}:${meta.id}`;
+    const key = lyricsKey(meta);
     if (cache.has(key)) return Promise.resolve(cache.get(key));
     if (!lyricsPending.has(key)) {
       lyricsPending.set(
@@ -1333,7 +1348,8 @@
     const key = String(meta.id);
     if (key === lyricsFor) return;
     lyricsFor = key;
-    let hit = cache.get(`${fromYandex(meta) ? 'ym' : 'lrc'}:${key}`);
+    const gen = lyricsGen;
+    let hit = cache.get(lyricsKey(meta));
     if (hit === undefined) {
       lines = [];
       plain = '';
@@ -1342,7 +1358,7 @@
       render();
       mountPlayerButtons();
       hit = await fetchLyrics(meta);
-      if (lyricsFor !== key) return;
+      if (lyricsFor !== key || gen !== lyricsGen) return;
     }
     lyricsAvailable = !!(hit && (hit.syncedLyrics || hit.plainLyrics));
     // Текста у нового трека нет — окно плавно уходит со старым текстом, без «Текст не найден».
@@ -1812,6 +1828,7 @@
     const before = cfg.lyricsAlways === undefined ? null : sources(cfg);
     cfg = e.detail || {};
     if (before !== null && before !== sources(cfg)) {
+      lyricsGen++;
       cache.clear();
       lyricsFor = '';
     }
