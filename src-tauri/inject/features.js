@@ -1606,11 +1606,29 @@
   // Кадры крутятся, только пока окно текста открыто: пустой цикл requestAnimationFrame
   // заставляет WebView2 готовить каждый кадр монитора и при закрытом окне.
   let frameId = 0;
+  let frameAt = 0;
   const startFrames = () => {
     if (!frameId) frameId = requestAnimationFrame(frame);
   };
+  // Окно снова видно (развернули, показали из трея, открыли из-под других окон): кадр,
+  // заказанный, пока оно было скрыто, WebView2 может так и не отдать, и цикл замирает.
+  // Заказываем заново, а текст сразу ставим на текущую строку, без прокрутки через весь текст.
+  const resumeFrames = () => {
+    if (!lyricsOpen || document.hidden) return;
+    cancelAnimationFrame(frameId);
+    frameId = 0;
+    activeIndex = -2;
+    snapScroll = true;
+    startFrames();
+  };
+  document.addEventListener('visibilitychange', resumeFrames);
+  // Страховка: окно видно, текст открыт, а кадров нет дольше полсекунды.
+  setInterval(() => {
+    if (lyricsOpen && !document.hidden && performance.now() - frameAt > 500) resumeFrames();
+  }, 1000);
   const frame = () => {
     frameId = 0;
+    frameAt = performance.now();
     if (!lyricsOpen) return;
     if (panel) {
       const playing = !!player.isPlaying();
@@ -1721,7 +1739,12 @@
     // и он закрывается, а колесо и фокус он гасит.
     if (!panel) return;
     const host = on ? m : document.body;
-    if (panel.parentElement !== host) host.appendChild(panel);
+    if (panel.parentElement !== host) {
+      host.appendChild(panel);
+      // Перенос сбрасывает прокрутку в начало — сразу возвращаем текст к текущей строке.
+      activeIndex = -2;
+      snapScroll = true;
+    }
   };
   const toggleFull = (force) => {
     const want = typeof force === 'boolean' ? force : !lyricsFull;
