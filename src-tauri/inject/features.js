@@ -86,6 +86,12 @@
     /* translate, а не transform: Яндекс сам ставит обложку через transform, сдвиг складывается с ним. */
     [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"] { transition: translate .8s cubic-bezier(.2,.8,.2,1); }
     [data-tune-fs] [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"] { translate: -25vw 0; }
+    /* Очередь или текст Яндекса: обложку сдвигает сам Яндекс (на ту же четверть экрана),
+       наш сдвиг не добавляется — иначе она уезжает на полэкрана. */
+    [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"][class*="fullscreenContent_enter"] { translate: 0 0 !important; }
+    /* Смена нашего текста на очередь и обратно: обложка и там и там на одном месте —
+       стоит, а не съезжает в центр и обратно. */
+    [data-tune-handoff] [data-test-id="FULLSCREEN_PLAYER_FULLSCREEN_CONTENT"] { animation-duration: 0s !important; transition: none !important; }
     .tune-ly-head { display: flex; align-items: center; gap: var(--ym-spacer-size-m, 12px); padding: var(--ym-spacer-size-l, 16px); }
     .tune-ly-head img { width: 48px; height: 48px; border-radius: var(--ym-radius-size-m, 8px); object-fit: cover; flex: none; }
     .tune-ly-head img:not([src]), .tune-ly-head img[src=""] { visibility: hidden; }
@@ -1166,6 +1172,7 @@
   const SEARCHING = 'Ищем текст…';
   let offset = 0;
   let userScrollAt = 0;
+  let snapScroll = false;
   let activeIndex = -1;
   const cache = new Map();
 
@@ -1174,20 +1181,49 @@
   // Свой синхронный текст Яндекса берём у Яндекса, если не просили искать и для таких треков.
   const fromYandex = (meta) => !cfg.lyricsAlways && !!(meta && meta.lyricsInfo && meta.lyricsInfo.hasAvailableSyncLyrics);
 
+  // Строки с авторами, которые источники ставят в начало текста: «作词 : …»,
+  // «Lyrics by: …», «Текст: …». Это не слова песни.
+  const CREDIT_WORDS = /^(lyrics|lyricist|composer|composed|written|producer|produced|arrang|mix|master|текст|слова|музыка|автор|аранжировка|сведение|мастеринг)/;
+  const isCredit = (line) => {
+    const m = /^\s*([^:：]{1,24})[:：]/.exec(line);
+    if (!m) return false;
+    const head = m[1].trim().toLowerCase();
+    return /[\u4e00-\u9fff]/.test(head) || CREDIT_WORDS.test(head);
+  };
   const parseLrc = (text) => {
     const out = [];
     for (const raw of text.split(/\r?\n/)) {
       const stamps = [...raw.matchAll(/\[(\d+):(\d+(?:[.,]\d+)?)\]/g)];
       if (!stamps.length) continue;
       const body = raw.replace(/\[[^\]]*\]/g, '').trim();
+      if (isCredit(body)) continue;
       for (const s of stamps) out.push({ t: Number(s[1]) * 60 + Number(s[2].replace(',', '.')), text: body });
     }
     return out.sort((a, b) => a.t - b.t);
   };
 
+  // Для сравнения названий: без регистра, «ё», скобок с пометками и знаков.
+  const normName = (v) =>
+    String(v || '')
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/[([（][^)\]）]*[)\]）]/g, '')
+      .replace(/[^\p{L}\p{N}]/gu, '');
+  const artistNames = (meta) => (meta.artists || []).map((a) => a.name).filter(Boolean);
+  // Чужой трек с похожим названием хуже, чем никакого: берём только тот же трек.
+  const sameTrack = (meta, title, artist, seconds) => {
+    if (!title || normName(title) !== normName(meta.title)) return false;
+    const theirs = normName(artist);
+    const artistOk = !theirs || artistNames(meta).some((n) => {
+      const mine = normName(n);
+      return mine && (theirs.includes(mine) || mine.includes(theirs));
+    });
+    const duration = Math.round((meta.durationMs || 0) / 1000);
+    return artistOk && (!duration || !seconds || Math.abs(seconds - duration) <= 6);
+  };
+
   const lrclib = async (meta) => {
-    const artist = (meta.artists || []).map((a) => a.name).join(', ');
-    const firstArtist = ((meta.artists || [])[0] || {}).name || artist;
+    const firstArtist = artistNames(meta)[0] || '';
     const title = meta.title;
     const album = ((meta.albums || [])[0] || {}).title || '';
     const duration = Math.round((meta.durationMs || 0) / 1000);
@@ -1196,17 +1232,17 @@
       const r = await fetch(url, { headers: { 'Lrclib-Client': 'Tune Music' } });
       return r.ok ? r.json() : null;
     };
-    let hit = await get(`https://lrclib.net/api/get?${q({ track_name: title, artist_name: firstArtist, album_name: album, duration })}`).catch(() => null);
-    if (!hit || (!hit.syncedLyrics && !hit.plainLyrics)) {
-      const list = (await get(`https://lrclib.net/api/search?${q({ track_name: title, artist_name: firstArtist })}`).catch(() => null)) || [];
-      const scored = list
-        .filter((x) => x.syncedLyrics || x.plainLyrics)
-        .map((x) => ({ x, d: Math.abs((x.duration || 0) - duration) + (x.syncedLyrics ? 0 : 30) }))
-        .sort((a, b) => a.d - b.d);
-      hit = scored.length && scored[0].d < 45 ? scored[0].x : null;
-    }
-    return hit;
+    const exact = await get(`https://lrclib.net/api/get?${q({ track_name: title, artist_name: firstArtist, album_name: album, duration })}`).catch(() => null);
+    if (exact && exact.syncedLyrics) return exact;
+    const list = (await get(`https://lrclib.net/api/search?${q({ track_name: title, artist_name: firstArtist })}`).catch(() => null)) || [];
+    const same = list.filter((x) => (x.syncedLyrics || x.plainLyrics || x.instrumental) && sameTrack(meta, x.trackName, x.artistName, x.duration));
+    return same.find((x) => x.syncedLyrics) || exact || same[0] || null;
   };
+
+  // NetEase: много синхронных текстов, в том числе русских. Запрос идёт через Tune —
+  // со страницы NetEase не пускает (нет заголовков CORS).
+  const netease = (meta) =>
+    T.invoke('page_lyrics', { title: meta.title, artists: artistNames(meta), duration: Math.round((meta.durationMs || 0) / 1000) }).catch(() => null);
 
   // Текст Яндекса качает его же хранилище (подпись запроса знает только клиент). Хранилище
   // одно на все треки, поэтому запросы идут по очереди.
@@ -1230,12 +1266,24 @@
     yandexQueue = job.catch(() => null);
     return job;
   };
+  // Яндекс (если выбран), затем LRCLIB и NetEase в порядке из настроек; каждый можно выключить. Синхронный текст лучше простого: простой из
+  // LRCLIB берём, только если синхронного не нашлось нигде.
   const findLyrics = async (meta) => {
     if (fromYandex(meta)) {
       const hit = await yandexLyrics(meta).catch(() => null);
       if (hit) return hit;
     }
-    return lrclib(meta);
+    const search = { lrclib: () => lrclib(meta), netease: () => netease(meta) };
+    const enabled = { lrclib: cfg.lyricsLrclib !== false, netease: cfg.lyricsNetease !== false };
+    const order = [...(cfg.lyricsOrder || []), 'lrclib', 'netease'].filter((s, i, a) => search[s] && a.indexOf(s) === i);
+    let fallback = null;
+    for (const src of order) {
+      if (!enabled[src]) continue;
+      const hit = await search[src]().catch(() => null);
+      if (hit && hit.syncedLyrics) return hit;
+      fallback = fallback || hit;
+    }
+    return fallback;
   };
 
   // Один запрос на трек: и текущий, и заранее подгружаемый следующий.
@@ -1306,7 +1354,11 @@
       lines = parseLrc(hit.syncedLyrics);
       status = '';
     } else if (hit && hit.plainLyrics) {
-      plain = hit.plainLyrics;
+      plain = hit.plainLyrics
+        .split(/\r?\n/)
+        .filter((l) => !isCredit(l))
+        .join('\n')
+        .trim();
       status = '';
     } else if (hit && hit.instrumental) {
       status = 'Инструментальный трек';
@@ -1432,8 +1484,14 @@
       el.textContent = plain;
       body.appendChild(el);
     }
+    // Без синхронных строк прокручивать не к чему — текст с начала.
+    if (!lines.length) body.scrollTop = 0;
     renderOffset();
-    activeIndex = -1;
+    // Текст пересобран — строку ищем заново и ставим на место сразу, без прокрутки через
+    // весь текст (прокрутка могла остаться внизу от прошлого трека).
+    activeIndex = -2;
+    snapScroll = true;
+    userScrollAt = 0;
   };
 
   // Позиция: прогресс Яндекса + время с последнего обновления, пока играет.
@@ -1481,7 +1539,8 @@
         const el = els[Math.max(0, i)];
         if (el && performance.now() - userScrollAt > 3000) {
           const body = panel.querySelector('.tune-ly-body');
-          body.scrollTo({ top: el.offsetTop - body.clientHeight * 0.38, behavior: 'smooth' });
+          body.scrollTo({ top: el.offsetTop - body.clientHeight * 0.38, behavior: snapScroll ? 'instant' : 'smooth' });
+          snapScroll = false;
         }
       }
     }
@@ -1540,9 +1599,24 @@
     }
     return null;
   };
+  let fsShifted = false;
+  let handoffTimer = 0;
   const markFs = () => {
     const m = fsModal();
     const on = lyricsOpen && lyricsFull && !lyricsOwn && !!m;
+    // Наш текст сменяется очередью Яндекса (или наоборот) — сдвиг обложки переходит от
+    // нас к Яндексу без анимации: она уже стоит там, где нужно.
+    const store = fsStore();
+    const split = !!(store && store.playQueue && store.playQueue.isVisible) || !!(m && m.querySelector('[class*="fullscreenContent_enter"]'));
+    if (m && on !== fsShifted && (on ? split : !!(store && store.playQueue && store.playQueue.isVisible))) {
+      m.dataset.tuneHandoff = '1';
+      clearTimeout(handoffTimer);
+      handoffTimer = setTimeout(() => {
+        const cur = fsModal();
+        if (cur) delete cur.dataset.tuneHandoff;
+      }, 1000);
+    }
+    fsShifted = on;
     for (const el of document.querySelectorAll('[data-tune-fs]')) if (!on || el !== m) delete el.dataset.tuneFs;
     if (on && !m.dataset.tuneFs) m.dataset.tuneFs = '1';
     // Текст живёт внутри плеера Яндекса: иначе клик по строке для плеера — «клик мимо»,
@@ -1727,20 +1801,26 @@
       refreshLyrics();
       prefetchNext();
     }
-    // Размер шрифта и прочее видно сразу, пока двигают ползунок в настройках.
-    if (lyricsOpen) render();
     mountPlayerButtons();
     applySpeed();
     if (cfg.uncensor) loadUncensor();
     mountUncensorBadges();
   };
   window.addEventListener('tune:features', (e) => {
-    const wasAlways = cfg.lyricsAlways;
+    // Сменили источники текста — найденное раньше больше не годится.
+    const sources = (c) => [c.lyricsAlways, c.lyricsLrclib, c.lyricsNetease, c.lyricsOrder].join();
+    const before = cfg.lyricsAlways === undefined ? null : sources(cfg);
     cfg = e.detail || {};
-    if (wasAlways !== undefined && wasAlways !== cfg.lyricsAlways) lyricsFor = '';
+    if (before !== null && before !== sources(cfg)) {
+      cache.clear();
+      lyricsFor = '';
+    }
     cfgReady();
     if (cfg.uncensor) loadUncensor();
     apply();
+    // Размер шрифта виден сразу, пока двигают ползунок в настройках. Только размер:
+    // полная перерисовка сбросила бы подсвеченную строку.
+    if (panel) panel.style.fontSize = `${cfg.lyricsFontSize || 22}px`;
     // Реверб и тон зависят только от настроек: новые узлы и плееры получают их сами.
     applyAudioFx();
   });

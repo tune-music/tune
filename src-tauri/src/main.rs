@@ -7,6 +7,7 @@ mod client;
 mod discord;
 mod download;
 mod intercept;
+mod lyrics;
 mod media;
 mod mixer;
 mod occlusion;
@@ -715,6 +716,13 @@ fn page_download(app: AppHandle, url: String, key: Option<String>, codec: String
     }))
 }
 
+/// Текст песни из NetEase, когда у Яндекса и в LRCLIB его нет (страница не может
+/// обратиться к NetEase сама: он не отвечает заголовками CORS).
+#[tauri::command]
+async fn page_lyrics(title: String, artists: Vec<String>, duration: u64) -> Result<Option<lyrics::Found>, String> {
+    tauri::async_runtime::spawn_blocking(move || lyrics::netease(&title, &artists, duration)).await.map_err(|e| e.to_string())?
+}
+
 /// Показывает скачанный файл в проводнике.
 #[tauri::command]
 fn page_reveal_download(id: u64) -> Result<(), String> {
@@ -1300,6 +1308,7 @@ fn main() {
             page_cookie,
             page_download,
             page_reveal_download,
+            page_lyrics,
             client_status,
             client_retry,
             list_addons,

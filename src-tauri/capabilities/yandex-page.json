@@ -21,6 +21,7 @@
     "allow-page-cookie",
     "allow-page-download",
     "allow-page-reveal-download",
+    "allow-page-lyrics",
     "allow-install-update",
     "allow-skip-update"
   ]

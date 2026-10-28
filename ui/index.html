@@ -105,12 +105,30 @@
               <div class="row">
                 <div class="row-text">
                   <div class="row-title">Синхронный текст песен</div>
-                  <div class="row-desc">Кнопка «Текст» открывает окно текста Tune — сбоку или на весь экран. Текст берётся у Яндекса, а если его нет — из LRCLIB. Строки подсвечиваются по ходу песни, клик по строке перематывает.</div>
+                  <div class="row-desc">Кнопка «Текст» открывает окно текста Tune — сбоку или на весь экран. Текст берётся у Яндекса, а если его нет — из LRCLIB или NetEase. Строки подсвечиваются по ходу песни, клик по строке перематывает.</div>
                 </div>
                 <input type="checkbox" class="switch" data-key="features.lyrics" />
               </div>
+              <div id="lyrics-sources">
+              <div class="row" data-dep="features.lyrics" data-source="lrclib">
+                <div class="row-text"><div class="row-title">LRCLIB</div><div class="row-desc">Открытая база синхронных текстов.</div></div>
+                <div class="row-controls">
+                  <button class="btn btn-ghost icon-btn" data-move="up" title="Выше — искать раньше"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+                  <button class="btn btn-ghost icon-btn" data-move="down" title="Ниже — искать позже"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+                  <input type="checkbox" class="switch" data-key="features.lyricsLrclib" />
+                </div>
+              </div>
+              <div class="row" data-dep="features.lyrics" data-source="netease">
+                <div class="row-text"><div class="row-title">NetEase Cloud Music</div><div class="row-desc">Много синхронных текстов, в том числе русских.</div></div>
+                <div class="row-controls">
+                  <button class="btn btn-ghost icon-btn" data-move="up" title="Выше — искать раньше"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+                  <button class="btn btn-ghost icon-btn" data-move="down" title="Ниже — искать позже"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+                  <input type="checkbox" class="switch" data-key="features.lyricsNetease" />
+                </div>
+              </div>
+              </div>
               <div class="row" data-dep="features.lyrics">
-                <div class="row-text"><div class="row-title">Искать и там, где у Яндекса есть свой текст</div><div class="row-desc">Брать текст из LRCLIB даже для треков с текстом Яндекса. Окно текста от этого не меняется.</div></div>
+                <div class="row-text"><div class="row-title">Искать и там, где у Яндекса есть свой текст</div><div class="row-desc">Брать текст из LRCLIB и NetEase даже для треков с текстом Яндекса. Окно текста от этого не меняется.</div></div>
                 <input type="checkbox" class="switch" data-key="features.lyricsAlways" />
               </div>
               <div class="row" data-dep="features.lyrics">

@@ -69,6 +69,12 @@ pub struct Features {
     pub lyrics: bool,
     /// Искать текст и для треков, у которых он есть в Яндексе.
     pub lyrics_always: bool,
+    /// Искать текст в LRCLIB.
+    pub lyrics_lrclib: bool,
+    /// Искать текст в NetEase Cloud Music.
+    pub lyrics_netease: bool,
+    /// Порядок источников текста: кто выше, у того и ищем раньше ("lrclib", "netease").
+    pub lyrics_order: Vec<String>,
     pub lyrics_font_size: u32,
     /// Колесо мыши над плеером меняет громкость.
     pub wheel_volume: bool,
@@ -103,6 +109,9 @@ impl Default for Features {
         Self {
             lyrics: true,
             lyrics_always: false,
+            lyrics_lrclib: true,
+            lyrics_netease: true,
+            lyrics_order: vec!["lrclib".into(), "netease".into()],
             lyrics_font_size: 22,
             wheel_volume: true,
             speed_control: false,

@@ -10,6 +10,7 @@ fn main() {
             "page_cookie",
             "page_download",
             "page_reveal_download",
+            "page_lyrics",
             "install_update",
             "skip_update",
             // страница первой загрузки интерфейса

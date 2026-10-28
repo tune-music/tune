@@ -858,8 +858,37 @@ function fillSettings() {
       input.value = opt ? opt.value : '1';
     } else input.value = v ?? '';
   }
+  placeLyricsSources();
   syncDeps();
 }
+
+// Источники текста: порядок строк — порядок поиска.
+const LYRICS_SOURCES = ['lrclib', 'netease'];
+function lyricsOrder() {
+  const saved = (state.settings.features.lyricsOrder || []).filter((s) => LYRICS_SOURCES.includes(s));
+  return [...saved, ...LYRICS_SOURCES.filter((s) => !saved.includes(s))];
+}
+function placeLyricsSources() {
+  const box = $('#lyrics-sources');
+  const order = lyricsOrder();
+  for (const src of order) box.appendChild($(`[data-source="${src}"]`, box));
+  $$('[data-move]', box).forEach((b) => {
+    const i = order.indexOf(b.closest('[data-source]').dataset.source);
+    b.disabled = b.dataset.move === 'up' ? i === 0 : i === order.length - 1;
+  });
+}
+$('#lyrics-sources').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-move]');
+  if (!b || !state.settings) return;
+  const order = lyricsOrder();
+  const i = order.indexOf(b.closest('[data-source]').dataset.source);
+  const j = b.dataset.move === 'up' ? i - 1 : i + 1;
+  if (j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  state.settings.features.lyricsOrder = order;
+  placeLyricsSources();
+  saveSettings(0);
+});
 
 function syncDeps() {
   const s = state.settings;
