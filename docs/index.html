@@ -29,7 +29,7 @@
       color-scheme: dark;
     }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; overflow-x: hidden; overflow-x: clip; }
     body {
       margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden;
       font: 16px/1.6 Manrope, "Segoe UI", system-ui, sans-serif;
@@ -87,7 +87,10 @@
     .app-bar .s { flex: 1; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--hi) 38%, var(--dim) 38%); margin: 0 3%; }
 
     /* ---------- Первый экран ---------- */
-    .hero { padding: 72px 0 96px; position: relative; overflow: hidden; }
+    /* clip, а не hidden: блок с overflow: hidden браузер прокручивает сам, чтобы показать якорь
+       (#download), и содержимое съезжает. */
+    .hero { padding: 72px 0 96px; position: relative; overflow: hidden; overflow: clip; }
+    [id] { scroll-margin-top: 84px; }
     .hero::before {
       content: ""; position: absolute; inset: -30% -20% auto auto; width: 900px; height: 900px; border-radius: 50%;
       background: radial-gradient(closest-side, rgba(250, 204, 21, .14), transparent); pointer-events: none;
@@ -140,7 +143,7 @@
     .section-lead { color: var(--text-2); margin: 0 0 44px; max-width: 640px; font-size: 17px; }
 
     /* Колода тем: карточки друг за другом под углом */
-    .deck-wrap { overflow: hidden; margin: 0 calc(50% - 50vw); padding: 40px 0 50px; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+    .deck-wrap { overflow: hidden; overflow: clip; margin: 0 calc(50% - 50vw); padding: 40px 0 50px; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
     .deck { display: flex; justify-content: center; perspective: 1600px; }
     .deck figure { margin: 0 0 0 -6%; width: min(360px, 30vw); flex: none; transform: rotateY(24deg) rotateZ(-2deg) translateZ(0); transform-origin: left center; transition: transform .5s cubic-bezier(.2,.8,.2,1), margin .5s cubic-bezier(.2,.8,.2,1); cursor: default; }
     .deck figure:first-child { margin-left: 0; }
@@ -166,7 +169,7 @@
     .f-text .new { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 2px 8px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 
     .stage {
-      position: relative; border-radius: 22px; border: 1px solid var(--border); padding: 34px; min-height: 340px; overflow: hidden; isolation: isolate;
+      position: relative; border-radius: 22px; border: 1px solid var(--border); padding: 34px; min-height: 340px; overflow: hidden; overflow: clip; isolation: isolate;
       background: radial-gradient(120% 90% at 85% 0%, var(--glow, rgba(250,204,21,.16)), transparent 60%), linear-gradient(180deg, #141417, #0d0d10);
       display: flex; align-items: center; justify-content: center;
     }
@@ -268,7 +271,7 @@
     .step h3 { margin: 0 0 6px; font-size: 17px; }
     .step p { margin: 0; color: var(--text-2); font-size: 15px; }
 
-    .final { text-align: center; padding: 110px 0; overflow: hidden; }
+    .final { text-align: center; padding: 110px 0; overflow: hidden; overflow: clip; }
     .final::before { content: ""; position: absolute; left: 50%; top: 50%; width: 900px; height: 500px; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(250,204,21,.12), transparent); pointer-events: none; }
     .final .cta { justify-content: center; }
     .final .section-lead { margin: 0 auto 32px; }
@@ -296,6 +299,7 @@
       .grid, .steps { grid-template-columns: 1fr; }
       nav a:not(.nav-dl) { display: none; }
       section { padding: 72px 0; }
+      .deck-wrap { margin: 0 -16px; mask-image: none; }
       .deck { justify-content: flex-start; overflow-x: auto; scroll-snap-type: x mandatory; padding: 20px 20px 30px; perspective: none; }
       .deck figure, .deck figure:nth-child(2n) { width: 72%; margin: 0 14px 0 0; transform: none; scroll-snap-align: center; }
       .deck figure:hover { transform: none; margin-right: 14px; }
