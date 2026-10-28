@@ -29,9 +29,11 @@
       color-scheme: dark;
     }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; overflow-x: hidden; overflow-x: clip; }
+    /* Горизонтальное переполнение — clip у html: hidden превратил бы body в отдельную
+       прокручиваемую область, и липкая верхняя панель уезжала бы вместе со страницей. */
+    html { scroll-behavior: smooth; overflow-x: clip; }
     body {
-      margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden;
+      margin: 0; background: var(--bg); color: var(--text);
       font: 16px/1.6 Manrope, "Segoe UI", system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
