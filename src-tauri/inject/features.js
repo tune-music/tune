@@ -130,6 +130,7 @@
     [data-tune^="lyrics"]:disabled { opacity: .35 !important; cursor: default; }
     .tune-ly-line { margin: 0 auto .7em; max-width: 86%; text-align: center; font-family: var(--ym-font-heading, var(--ym-font-text, inherit)); font-weight: var(--ym-font-weight-bold, 700); line-height: 1.25; letter-spacing: var(--ym-letter-spacing-m, normal); opacity: .22; cursor: pointer; transition: opacity .45s, transform .45s; transform-origin: center; }
     .tune-ly-line:hover { opacity: .65; }
+    .tune-static .tune-ly-line, .tune-static .tune-ly-line:hover { opacity: .85; cursor: default; }
     .tune-ly-line.tune-past { opacity: .3; }
     .tune-ly-line.tune-now { opacity: 1; transform: scale(1.12); }
     .tune-ly-line.tune-now + .tune-ly-line { opacity: .5; }
@@ -268,6 +269,7 @@
   };
   // Кнопка «Текст» в полноэкранном плеере: текст во весь экран или убрать его.
   const toggleFullLyrics = () => {
+    if (other && lyricsOpen) return showCurrent();
     if (lyricsOpen && lyricsFull) return toggleLyrics(false);
     if (!lyricsOpen) toggleLyrics(true);
     toggleFull(true);
@@ -1358,6 +1360,34 @@
     fetchLyrics(meta);
   };
 
+  const viewOf = (hit) => {
+    if (hit && hit.syncedLyrics) return { lines: parseLrc(hit.syncedLyrics), plain: '', status: '' };
+    if (hit && hit.plainLyrics) {
+      const text = hit.plainLyrics.split(/\r?\n/).filter((l) => !isCredit(l)).join('\n').trim();
+      return { lines: [], plain: text, status: '' };
+    }
+    return { lines: [], plain: '', status: hit && hit.instrumental ? 'Инструментальный трек' : 'Текст не найден' };
+  };
+
+  // Текст другого трека — из меню «…» в списке. Без подсветки и перемотки: трек не играет.
+  // Кнопка «Текст» в плеере возвращает окно к играющему треку.
+  let other = null;
+  const showOther = async (meta) => {
+    other = { meta, lines: [], plain: '', status: SEARCHING };
+    const mine = other;
+    if (!lyricsOpen) toggleLyrics(true);
+    else render();
+    const hit = await findLyrics(meta).catch(() => null);
+    if (other !== mine) return;
+    Object.assign(other, viewOf(hit));
+    render();
+  };
+  const showCurrent = () => {
+    other = null;
+    render();
+    mountPlayerButtons();
+  };
+
   const loadLyrics = async () => {
     const meta = ym.meta();
     if (!meta) return;
@@ -1378,25 +1408,9 @@
     }
     lyricsAvailable = !!(hit && (hit.syncedLyrics || hit.plainLyrics));
     // Текста у нового трека нет — окно плавно уходит со старым текстом, без «Текст не найден».
-    if (lyricsOpen && !lyricsAvailable) toggleLyrics(false);
-    lines = [];
-    plain = '';
+    if (lyricsOpen && !lyricsAvailable && !other) toggleLyrics(false);
     activeIndex = -1;
-    if (hit && hit.syncedLyrics) {
-      lines = parseLrc(hit.syncedLyrics);
-      status = '';
-    } else if (hit && hit.plainLyrics) {
-      plain = hit.plainLyrics
-        .split(/\r?\n/)
-        .filter((l) => !isCredit(l))
-        .join('\n')
-        .trim();
-      status = '';
-    } else if (hit && hit.instrumental) {
-      status = 'Инструментальный трек';
-    } else {
-      status = 'Текст не найден';
-    }
+    ({ lines, plain, status } = viewOf(hit));
     mountPlayerButtons();
     render();
     prefetchNext();
@@ -1447,7 +1461,7 @@
         renderOffset();
       }
       const line = e.target.closest('.tune-ly-line');
-      if (line && line.dataset.t) player.seek(Math.max(0, Number(line.dataset.t) - offset));
+      if (line && line.dataset.t && !other) player.seek(Math.max(0, Number(line.dataset.t) - offset));
     });
     const lyBody = panel.querySelector('.tune-ly-body');
     lyBody.addEventListener(
@@ -1474,7 +1488,10 @@
   const render = () => {
     if (!lyricsOpen) return;
     const p = ensurePanel();
-    const meta = ym.meta();
+    // Текст трека из меню «…» (не играющего) или играющего сейчас.
+    const view = other || { meta: ym.meta(), lines, plain, status };
+    const meta = view.meta;
+    p.classList.toggle('tune-static', !!other);
     p.style.fontSize = `${cfg.lyricsFontSize || 22}px`;
     const cover = meta ? ym.cover(meta, lyricsOwn ? '400x400' : '100x100') : '';
     p.querySelector('img').src = cover;
@@ -1488,17 +1505,17 @@
     p.querySelector('.tune-ly-sub').textContent = meta ? (meta.artists || []).map((a) => a.name).join(', ') : '';
     const body = p.querySelector('.tune-ly-body');
     body.textContent = '';
-    if (status) {
+    if (view.status) {
       const s = document.createElement('div');
       s.className = 'tune-ly-status';
-      if (status === SEARCHING) {
+      if (view.status === SEARCHING) {
         s.className = 'tune-ly-dots';
         s.innerHTML = '<i></i><i></i><i></i>';
-        s.title = status;
-      } else s.textContent = status;
+        s.title = view.status;
+      } else s.textContent = view.status;
       body.appendChild(s);
-    } else if (lines.length) {
-      for (const l of lines) {
+    } else if (view.lines.length) {
+      for (const l of view.lines) {
         const el = document.createElement('p');
         // Имена классов — как у родного текста Яндекса: темы оформляют его по
         // [class*="SyncLyricsLine_root"] и т. п., так они оформят и этот.
@@ -1510,14 +1527,14 @@
         el.appendChild(span);
         body.appendChild(el);
       }
-    } else if (plain) {
+    } else if (view.plain) {
       const el = document.createElement('div');
       el.className = 'tune-ly-plain';
-      el.textContent = plain;
+      el.textContent = view.plain;
       body.appendChild(el);
     }
     // Без синхронных строк прокручивать не к чему — текст с начала.
-    if (!lines.length) body.scrollTop = 0;
+    if (!view.lines.length || other) body.scrollTop = 0;
     renderOffset();
     // Текст пересобран — строку ищем заново и ставим на место сразу, без прокрутки через
     // весь текст (прокрутка могла остаться внизу от прошлого трека).
@@ -1553,7 +1570,7 @@
       const playing = !!player.isPlaying();
       if (panel.classList.contains('tune-playing') !== playing) panel.classList.toggle('tune-playing', playing);
     }
-    if (lyricsOpen && lines.length && panel) {
+    if (lyricsOpen && lines.length && panel && !other) {
       const t = position() + offset;
       let i = -1;
       for (let k = 0; k < lines.length; k++) {
@@ -1742,8 +1759,15 @@
     const meta = ym.meta();
     if (!tl || !tl.modal || !tl.modal.isOpened || !meta) return;
     const id = tl.trackId != null ? tl.trackId : tl.track && tl.track.id;
-    if (String(id) !== String(meta.id)) return; // текст другого трека — окно Tune его не покажет
+    if (id == null) return; // не знаем, чей это текст, — пусть покажет Яндекс
     tl.modal.close();
+    if (String(id) !== String(meta.id)) {
+      // Снимок трека из хранилища Яндекса: название, исполнители, обложка, длительность.
+      const snap = JSON.parse(JSON.stringify(tl.track || { id }));
+      const lyricsInfo = snap.lyricsInfo || { hasAvailableSyncLyrics: !!snap.hasSyncLyrics, hasAvailableTextLyrics: snap.hasLyrics !== false };
+      return showOther({ ...snap, lyricsInfo });
+    }
+    if (other) showCurrent();
     if (!lyricsOpen) toggleLyrics(true);
   };
   // Следит за страницей постоянно: сразу ставит кнопку в открывшийся полноэкранный плеер
@@ -1795,6 +1819,8 @@
 
   let closeTimer = 0;
   const toggleLyrics = (force) => {
+    // Открыт текст другого трека — кнопка «Текст» сначала возвращает к играющему.
+    if (other && lyricsOpen && force === undefined) return showCurrent();
     lyricsOpen = typeof force === 'boolean' ? force : !lyricsOpen;
     const p = ensurePanel();
     const wasShown = !p.hidden;
@@ -1821,6 +1847,7 @@
       p.classList.remove('tune-closing');
       if (lyricsOpen) return;
       p.hidden = true;
+      other = null;
       if (lyricsFull) {
         fsOpenedByUs = false;
         toggleFull(false);
