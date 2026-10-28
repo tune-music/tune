@@ -1277,6 +1277,17 @@
   };
   // Яндекс (если выбран), затем LRCLIB и NetEase в порядке из настроек; каждый можно выключить. Синхронный текст лучше простого: простой из
   // LRCLIB берём, только если синхронного не нашлось нигде.
+  // Обычный текст Яндекса (без времени) качает хранилище trackLyrics — то, что
+  // показывает его окно текста; окно для этого не открываем.
+  const yandexText = async (meta) => {
+    for (let i = 0; i < 40 && !rootStore(); i++) await new Promise((r) => setTimeout(r, 250));
+    const tl = rootStore() && rootStore().trackLyrics;
+    if (!tl || typeof tl.getLyrics !== 'function') return null;
+    await tl.getLyrics(meta.id);
+    for (let i = 0; i < 40 && tl.isLoading; i++) await new Promise((r) => setTimeout(r, 100));
+    return String(tl.currentTrackId) === String(meta.id) && tl.lyrics ? { plainLyrics: tl.lyrics } : null;
+  };
+
   const findLyrics = async (meta) => {
     if (fromYandex(meta)) {
       const hit = await yandexLyrics(meta).catch(() => null);
@@ -1297,6 +1308,11 @@
     if (yandexSync(meta) && !fromYandex(meta)) {
       const own = await yandexLyrics(meta).catch(() => null);
       if (own) return own;
+    }
+    // Синхронного нет нигде — обычный текст Яндекса лучше простого из LRCLIB.
+    if (meta.lyricsInfo && meta.lyricsInfo.hasAvailableTextLyrics) {
+      const text = await yandexText(meta).catch(() => null);
+      if (text) return text;
     }
     return fallback;
   };
@@ -1422,7 +1438,7 @@
     panel.addEventListener('click', (e) => {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'close') toggleLyrics(false);
-      if (act === 'full') lyricsFull ? leaveFull() : toggleFull(true);
+      if (act === 'full') lyricsFull ? collapseFull() : toggleFull(true);
       if (act === 'prev') player.prev();
       if (act === 'next') player.next();
       if (act === 'play') player.toggle();
@@ -1601,6 +1617,8 @@
   // Хранилище полноэкранного плеера Яндекса (fullscreenPlayer): открывает плеер с любой
   // страницы, даже с главной «Моей волны», где кнопки «на весь экран» нет, и знает про очередь.
   let fsStoreCache = null;
+  let rootStoreCache = null;
+  const rootStore = () => (fsStore(), rootStoreCache);
   const fsStore = () => {
     if (fsStoreCache) return fsStoreCache;
     for (const start of document.querySelectorAll('main, [class*="CommonLayout"]')) {
@@ -1609,6 +1627,7 @@
       for (let i = 0; f && i < 600; i++, f = f.return) {
         const v = f.memoizedProps && f.memoizedProps.value;
         if (v && typeof v === 'object' && v.fullscreenPlayer && typeof v.fullscreenPlayer.showFullscreenPlayerModal === 'function') {
+          rootStoreCache = v;
           return (fsStoreCache = v.fullscreenPlayer);
         }
       }
@@ -1680,6 +1699,12 @@
   };
   // Выход из полного экрана: если плеер открыли мы — назад к окну, иначе просто прячем текст.
   const leaveFull = () => (fsOpenedByUs ? toggleFull(false) : toggleLyrics(false));
+  // Кнопка «Свернуть»: текст уходит в окно, а полноэкранный плеер закрывается, кто бы его
+  // ни открыл, — иначе окно оказалось бы под ним.
+  const collapseFull = () => {
+    fsOpenedByUs = true;
+    toggleFull(false);
+  };
   // Кнопка закрытия плеера Яндекса: переходим к окну сразу, вместе с его анимацией, а не
   // рывком после того, как плеер исчезнет. Плеер он закрывает сам.
   document.addEventListener(
@@ -1701,6 +1726,26 @@
     );
   let popupsSeen = new Set();
   let domCheck = 0;
+  // Текст Яндекса в полноэкранном плеере или его окно с текстом играющего трека —
+  // закрываем и открываем текст Tune (сбоку или во весь экран, как было у Яндекса).
+  const replaceYandexLyrics = () => {
+    if (!cfg.lyrics) return;
+    const store = fsStore();
+    if (store && store.isSyncLyricsMode) {
+      store.hideSyncLyrics();
+      if (!lyricsOpen) toggleLyrics(true);
+      toggleFull(true);
+      return;
+    }
+    const root = rootStore();
+    const tl = root && root.trackLyrics;
+    const meta = ym.meta();
+    if (!tl || !tl.modal || !tl.modal.isOpened || !meta) return;
+    const id = tl.trackId != null ? tl.trackId : tl.track && tl.track.id;
+    if (String(id) !== String(meta.id)) return; // текст другого трека — окно Tune его не покажет
+    tl.modal.close();
+    if (!lyricsOpen) toggleLyrics(true);
+  };
   // Следит за страницей постоянно: сразу ставит кнопку в открывшийся полноэкранный плеер
   // и пункт в меню, а открытое окно текста убирает при появлении другого меню.
   const domWatch = new MutationObserver(() => {
@@ -1711,15 +1756,16 @@
       mountVibeLyrics();
       mountMenuItems();
       mountUncensorBadges();
+      replaceYandexLyrics();
       if (!lyricsOpen) return;
       if (lyricsFull) {
         // Плеер закрыли кнопкой Яндекса — выходим из полного экрана вместе с ним.
         if (fsModal()) {
           fsSeen = true;
           markFs();
-          // В плеере открыли очередь (или родной текст Яндекса) — наш текст уступает место.
+          // В плеере открыли очередь — наш текст уступает место.
           const store = fsStore();
-          if (store && ((store.playQueue && store.playQueue.isVisible) || store.isSyncLyricsMode)) {
+          if (store && store.playQueue && store.playQueue.isVisible) {
             toggleLyrics(false);
             return;
           }
