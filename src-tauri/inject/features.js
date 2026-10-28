@@ -339,12 +339,30 @@
   const PLAYER_MENU_BUTTONS =
     '[data-test-id="PLAYERBAR_DESKTOP_CONTEXT_MENU_BUTTON"], [data-test-id="FULLSCREEN_PLAYER_CONTEXT_MENU_BUTTON"], [data-test-id="VIBE_CONTEXT_MENU_BUTTON"]';
   let playerMenuAt = 0;
+  // Трек, у которого открыли «…» в списке: его объект лежит в свойствах React у строки.
+  let listMenuTrack = null;
+  let listMenuAt = 0;
+  const trackOfButton = (btn) => {
+    const key = Object.keys(btn).find((k) => k.startsWith('__reactFiber'));
+    let f = key && btn[key];
+    for (let i = 0; f && i < 40; i++, f = f.return) {
+      const t = f.memoizedProps && f.memoizedProps.track;
+      if (t && t.id && t.title) return t;
+    }
+    return null;
+  };
   // Меню Яндекса открываются уже на нажатии: click потом приходит в само меню, не в кнопку.
   for (const type of ['pointerdown', 'click', 'keydown']) {
     document.addEventListener(
       type,
       (e) => {
-        if (e.target instanceof Element && e.target.closest(PLAYER_MENU_BUTTONS)) playerMenuAt = performance.now();
+        if (!(e.target instanceof Element)) return;
+        if (e.target.closest(PLAYER_MENU_BUTTONS)) playerMenuAt = performance.now();
+        const listBtn = e.target.closest('[data-test-id="TRACK_CONTEXT_MENU_BUTTON"]');
+        if (listBtn) {
+          listMenuTrack = trackOfButton(listBtn);
+          listMenuAt = performance.now();
+        }
       },
       true
     );
@@ -365,7 +383,28 @@
     });
     return item;
   };
+  // «Текст песни» в меню «…» любого трека в списке — когда у Яндекса такого пункта нет
+  // (текста у него нет или он только синхронный). Текст ищется по всем источникам.
+  const mountListLyricsItem = () => {
+    const menu = document.querySelector('[role="menu"]');
+    if (!menu || !cfg.lyrics || menu.querySelector('[data-tune="lyrics-menu"]')) return;
+    if (menu.querySelector('[data-test-id="TRACK_CONTEXT_MENU_LYRICS_BUTTON"]')) return; // его заменит окно Tune
+    const about = menu.querySelector('[data-test-id="TRACK_CONTEXT_MENU_ABOUT_TRACK_BUTTON"]');
+    const ref = about || [...menu.querySelectorAll('[role="menuitem"]')].pop();
+    if (!ref) return;
+    const track = listMenuTrack;
+    const item = menuItem(menu, ref, 'lyrics-menu', SYNC_ICON, 'Текст песни', () => {
+      const meta = ym.meta();
+      if (meta && String(meta.id) === String(track.id)) {
+        if (other) showCurrent();
+        if (!lyricsOpen) toggleLyrics(true);
+      } else showOther(trackMeta(track));
+    });
+    if (about) about.before(item);
+    else ref.after(item);
+  };
   const mountMenuItems = () => {
+    if (performance.now() - listMenuAt < 2000 && listMenuTrack) return mountListLyricsItem();
     if (performance.now() - playerMenuAt > 2000) return;
     const menu = document.querySelector('[role="menu"]');
     if (!menu) return;
@@ -1372,6 +1411,13 @@
   // Текст другого трека — из меню «…» в списке. Без подсветки и перемотки: трек не играет.
   // Кнопка «Текст» в плеере возвращает окно к играющему треку.
   let other = null;
+  // Снимок трека из хранилища Яндекса: название, исполнители, обложка, длительность.
+  // Признаки текста там — hasLyrics и hasSyncLyrics, а не lyricsInfo, как у играющего.
+  const trackMeta = (t) => {
+    const snap = JSON.parse(JSON.stringify(t));
+    const lyricsInfo = snap.lyricsInfo || { hasAvailableSyncLyrics: !!snap.hasSyncLyrics, hasAvailableTextLyrics: snap.hasLyrics !== false };
+    return { ...snap, lyricsInfo };
+  };
   const showOther = async (meta) => {
     other = { meta, lines: [], plain: '', status: SEARCHING };
     const mine = other;
@@ -1763,9 +1809,7 @@
     tl.modal.close();
     if (String(id) !== String(meta.id)) {
       // Снимок трека из хранилища Яндекса: название, исполнители, обложка, длительность.
-      const snap = JSON.parse(JSON.stringify(tl.track || { id }));
-      const lyricsInfo = snap.lyricsInfo || { hasAvailableSyncLyrics: !!snap.hasSyncLyrics, hasAvailableTextLyrics: snap.hasLyrics !== false };
-      return showOther({ ...snap, lyricsInfo });
+      return showOther(trackMeta(tl.track || { id }));
     }
     if (other) showCurrent();
     if (!lyricsOpen) toggleLyrics(true);
