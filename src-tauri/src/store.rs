@@ -100,6 +100,10 @@ pub struct Features {
     pub download_button: bool,
     /// Версии треков без цензуры из открытого списка FckCensor.
     pub uncensor: bool,
+    /// Восстановленные «Без цензуры» треки, удалённые из Яндекса, попадаются в «Моей волне».
+    pub uncensor_wave: bool,
+    /// Свои (загруженные) треки из «Мне нравится» попадаются в «Моей волне».
+    pub local_in_wave: bool,
     /// Помнить последний трек и очередь, если Ynison не отдал их при запуске.
     pub keep_track: bool,
 }
@@ -125,6 +129,8 @@ impl Default for Features {
             download: true,
             download_button: false,
             uncensor: true,
+            uncensor_wave: true,
+            local_in_wave: false,
             keep_track: true,
         }
     }

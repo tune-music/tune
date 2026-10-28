@@ -13,6 +13,7 @@ mod mixer;
 mod occlusion;
 mod proxy;
 mod repo;
+mod spoof;
 mod store;
 mod update;
 
@@ -423,6 +424,7 @@ fn attach_client(app: &AppHandle, win: &WebviewWindow) -> Result<(), String> {
     let hooks = intercept::Hooks {
         head_script: Box::new(move || head_script(&h1)),
         addon_server: Box::new(move |path, query| addon_server(&h2, path, query)),
+        data_root: root.clone(),
     };
     intercept::install(win, Arc::new(asar), hooks).map_err(|e| e.to_string())
 }
@@ -714,6 +716,19 @@ fn page_download(app: AppHandle, url: String, key: Option<String>, codec: String
     Ok(download::start(download::Job { url, key, codec, name }, dir, move |ev| {
         eval_client(&handle, &format!("window.dispatchEvent(new CustomEvent('tune:download',{{detail:{ev}}}))"));
     }))
+}
+
+/// Свой файл для подмены трека или обложки («Подменить…» в меню «…»): кладём в папку
+/// данных Tune, страница получает имя и берёт файл по адресу /__tune/spoof/<имя>.
+#[tauri::command]
+fn page_spoof_save(ext: String, data: String, state: State<AppState>) -> Result<String, String> {
+    let bytes = base64::engine::general_purpose::STANDARD.decode(data.as_bytes()).map_err(|e| e.to_string())?;
+    spoof::save(state.store.root(), &ext, &bytes)
+}
+
+#[tauri::command]
+fn page_spoof_remove(name: String, state: State<AppState>) -> Result<(), String> {
+    spoof::remove(state.store.root(), &name)
 }
 
 /// Текст песни из NetEase, когда у Яндекса и в LRCLIB его нет (страница не может
@@ -1309,6 +1324,8 @@ fn main() {
             page_download,
             page_reveal_download,
             page_lyrics,
+            page_spoof_save,
+            page_spoof_remove,
             client_status,
             client_retry,
             list_addons,

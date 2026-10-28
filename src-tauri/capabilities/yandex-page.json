@@ -22,6 +22,8 @@
     "allow-page-download",
     "allow-page-reveal-download",
     "allow-page-lyrics",
+    "allow-page-spoof-save",
+    "allow-page-spoof-remove",
     "allow-install-update",
     "allow-skip-update"
   ]

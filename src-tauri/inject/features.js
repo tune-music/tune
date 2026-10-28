@@ -383,12 +383,11 @@
     });
     return item;
   };
-  // «Текст песни» в меню «…» любого трека в списке — когда у Яндекса такого пункта нет
-  // (текста у него нет или он только синхронный). Текст ищется по всем источникам.
+  // «Текст песни» в меню «…» любого трека в списке — всегда наш: свой пункт Яндекса
+  // («Показать текст песни») прячем. Текст ищется по всем источникам, в том числе у Яндекса.
   const mountListLyricsItem = () => {
     const menu = document.querySelector('[role="menu"]');
     if (!menu || !cfg.lyrics || menu.querySelector('[data-tune="lyrics-menu"]')) return;
-    if (menu.querySelector('[data-test-id="TRACK_CONTEXT_MENU_LYRICS_BUTTON"]')) return; // его заменит окно Tune
     const about = menu.querySelector('[data-test-id="TRACK_CONTEXT_MENU_ABOUT_TRACK_BUTTON"]');
     const ref = about || [...menu.querySelectorAll('[role="menuitem"]')].pop();
     if (!ref) return;
@@ -403,7 +402,22 @@
     if (about) about.before(item);
     else ref.after(item);
   };
+  // Пункты текста Яндекса («Показать текст песни» и т. п.) открывают его панель, порой
+  // пустую, — рядом с нашим «Текст песни» они лишние. Прячем, а не удаляем: элементы меню
+  // принадлежат React.
+  const YM_SYNC_LYRICS_ITEMS =
+    '[data-test-id="TRACK_CONTEXT_MENU_LYRICS_BUTTON"], [data-test-id="TRACK_CONTEXT_MENU_SHOW_SYNC_LYRICS_BUTTON"], [data-test-id="TRACK_CONTEXT_MENU_HIDE_SYNC_LYRICS_BUTTON"], [data-test-id="VIBE_CONTEXT_MENU_SYNC_LYRICS_ITEM"]';
+  const hideYandexLyricsItems = () => {
+    const menu = document.querySelector('[role="menu"]');
+    if (!menu || !cfg.lyrics || !menu.querySelector('[data-tune="lyrics-menu"]')) return;
+    for (const el of menu.querySelectorAll(YM_SYNC_LYRICS_ITEMS)) if (el.style.display !== 'none') el.style.display = 'none';
+  };
   const mountMenuItems = () => {
+    mountMenuItemsInner();
+    mountSpoofMenuItem();
+    hideYandexLyricsItems();
+  };
+  const mountMenuItemsInner = () => {
     if (performance.now() - listMenuAt < 2000 && listMenuTrack) return mountListLyricsItem();
     if (performance.now() - playerMenuAt > 2000) return;
     const menu = document.querySelector('[role="menu"]');
@@ -596,75 +610,180 @@
   });
 
   // ---------------------------------------------------------------------------
-  // Без цензуры — по открытым данным FckCensor (github.com/Hazzz895/FckCensorData):
-  // для треков из списка ответ get-file-info подменяется ссылкой на версию без цензуры.
-  // Плеер Яндекса сам качает и играет её, как обычный файл (mp3, transport=raw).
+  // Без цензуры — по открытым данным FckCensor (github.com/Hazzz895/FckCensorData).
+  // Аудио: для треков из списка ответ get-file-info подменяется ссылкой на версию без
+  // цензуры, плеер Яндекса сам качает и играет её, как обычный файл (mp3, transport=raw).
+  // Данные: в ответах API Яндекса у треков и альбомов из списка подменяются названия,
+  // исполнители, обложки и длительность, а в альбомы возвращаются удалённые треки.
+  // Список и файлы лежат на GitHub; если он недоступен — берём их с зеркала jsDelivr.
   // Сам аддон FckCensor 2 требует SDK PulseSync 2, которого в Tune нет.
   // ---------------------------------------------------------------------------
   const origFetch = window.fetch.bind(window);
-  const UNCENSOR_LIST = 'https://raw.githubusercontent.com/Hazzz895/FckCensorData/refs/heads/main/list_v2.json';
+  const UC_MIRRORS = ['https://raw.githubusercontent.com/Hazzz895/FckCensorData/refs/heads/main/', 'https://cdn.jsdelivr.net/gh/Hazzz895/FckCensorData@main/'];
   // Список дополняют авторы FckCensor — перечитываем его раз в час, пока Tune открыт.
   const UNCENSOR_TTL = 3600 * 1000;
   let cfgReady;
   const cfgLoaded = new Promise((r) => (cfgReady = r));
-  let uncensorMap = null; // Map<id, url>
+  // files: id → ссылка на файл без цензуры; tracks / albums: id → подменённые поля.
+  let uc = null;
   let uncensorAt = 0;
   let uncensorLoading = null;
+  // Зеркало, с которого в последний раз пришёл список, — с него же качаем и треки.
+  let ucMirror = 0;
+  const ucUrl = (url) => {
+    const full = /^https?:\/\//.test(url) ? url : `https://${url}`;
+    return ucMirror && full.startsWith(UC_MIRRORS[0]) ? UC_MIRRORS[ucMirror] + full.slice(UC_MIRRORS[0].length) : full;
+  };
+  // Свои подмены из окна «Подменить…»: { track | album | artist: { id: поля } }. Поля — как
+  // у FckCensor (title / name, artists, coverUri, durationMs, volumes, releaseDate), плюс
+  // audio — свой файл трека, insert — треки и альбомы в профиле исполнителя, noAuto —
+  // автоподмена из списка для этого id выключена. Свои поля важнее автоматических.
+  const OWN_KEY = 'tune:spoofs';
+  let own = { track: {}, album: {}, artist: {} };
+  try {
+    const v = JSON.parse(localStorage.getItem(OWN_KEY) || 'null');
+    if (v && typeof v === 'object') own = { track: {}, album: {}, artist: {}, ...v };
+  } catch (e) {}
+  // Прежний пункт «Играть с цензурой» выключал подмену без возможности вернуть её у
+  // скрытых Яндексом треков — его настройку сбрасываем.
+  try {
+    localStorage.removeItem('tune:uncensor-off');
+  } catch (e) {}
+  const saveOwn = () => {
+    try {
+      localStorage.setItem(OWN_KEY, JSON.stringify(own));
+      return true;
+    } catch (e) {
+      T.toast('Не удалось сохранить подмену', { error: true });
+      return false;
+    }
+  };
+  const spoofFileUrl = (name) => `${location.origin}/__tune/spoof/${name}`;
+  const AUTO_MAPS = { track: 'tracks', album: 'albums', artist: 'artists' };
+  const autoOn = (type, id) => !(own[type][id] && own[type][id].noAuto);
+  const autoSpoof = (type, id) => (uc && autoOn(type, id) && uc[AUTO_MAPS[type]].get(String(id))) || null;
+  const spoofOf = (type, id) => {
+    id = String(id);
+    const auto = autoSpoof(type, id);
+    const o = own[type][id];
+    if (!auto && !o) return null;
+    const { noAuto, audio, insert, ...mine } = o || {};
+    const merged = { ...auto, ...mine };
+    return Object.keys(merged).length ? merged : null;
+  };
+  // Файл трека: свой из окна подмены, иначе версия без цензуры из списка.
+  const AUDIO_CODECS = { mp3: 'mp3', flac: 'flac', ogg: 'ogg', opus: 'ogg', wav: 'wav', m4a: 'aac', aac: 'aac' };
+  const ucFile = (id) => {
+    if (!id) return null;
+    id = String(id);
+    const o = own.track[id];
+    if (o && o.audio && o.audio.file) return { url: spoofFileUrl(o.audio.file), codec: o.audio.codec || 'mp3', own: true };
+    const url = uc && autoOn('track', id) && uc.files.get(id);
+    return url ? { url: ucUrl(url), codec: 'mp3' } : null;
+  };
+  // Треки и альбомы, добавленные в профиль исполнителя: свои или из списка.
+  const insertsOf = (artistId) => {
+    artistId = String(artistId);
+    const o = own.artist[artistId];
+    if (o && o.insert) return o.insert;
+    return (uc && autoOn('artist', artistId) && uc.inserts.get(artistId)) || null;
+  };
+
+  // Формат list_v2: в sources — подмены полей (tracks, albums) и хранилища файлов
+  // (tracksStorages: trackIds по шаблону ссылки или tracks: id → номер файла / ссылка).
+  // Как у FckCensor: поля — из первого источника, где они есть, файлы — из последнего.
   const parseUncensor = (list) => {
-    const map = new Map();
+    const files = new Map();
+    const tracks = new Map();
+    const albums = new Map();
+    const artists = new Map();
+    const inserts = new Map();
+    const isId = (id) => /^\d+$/.test(id);
+    const idList = (list) => (Array.isArray(list) ? list : []).map((x) => String(x && typeof x === 'object' ? x.releaseId || x.id : x)).filter(isId);
+    const addTrack = (id, data) => tracks.set(id, { ...tracks.get(id), ...data });
     for (const src of (list && list.sources) || []) {
+      for (const [id, t] of Object.entries(src.tracks || {})) if (isId(id) && t && typeof t === 'object' && !tracks.has(id)) tracks.set(id, { ...t });
+      for (const [id, a] of Object.entries(src.albums || {})) if (isId(id) && a && typeof a === 'object' && !albums.has(id)) albums.set(id, a);
+      for (const [id, a] of Object.entries(src.artists || {})) if (isId(id) && a && typeof a === 'object' && !artists.has(id)) artists.set(id, a);
+      for (const [id, ins] of Object.entries(src.artistsInsertions || {}))
+        if (isId(id) && ins && typeof ins === 'object' && !inserts.has(id)) inserts.set(id, { tracks: idList(ins.tracks), albums: idList(ins.albums) });
       for (const st of src.tracksStorages || []) {
-        if (!st || typeof st.urlTemplate !== 'string') continue;
-        for (const t of st.trackIds || []) {
-          const id = String(t && typeof t === 'object' ? t.id : t);
-          if (!/^\d+$/.test(id) || map.has(id)) continue;
-          const url = st.urlTemplate.replace('%%', id);
-          map.set(id, /^https?:\/\//.test(url) ? url : `https://${url}`);
+        if (!st) continue;
+        const tpl = typeof st.urlTemplate === 'string' ? st.urlTemplate : '';
+        const resolve = (raw) => (typeof raw === 'number' || (typeof raw === 'string' && !raw.includes('://'))) && tpl ? tpl.replace('%%', String(raw)) : raw;
+        if (tpl)
+          for (const t of st.trackIds || []) {
+            const id = String(t && typeof t === 'object' ? t.id : t);
+            if (!isId(id)) continue;
+            files.set(id, tpl.replace('%%', id));
+            if (t && typeof t.durationMs === 'number') addTrack(id, { durationMs: t.durationMs });
+          }
+        for (const [id, r] of Object.entries(st.tracks || {})) {
+          if (!isId(id)) continue;
+          const url = resolve(r && typeof r === 'object' ? r.url : r);
+          if (typeof url === 'string' && url) files.set(id, url);
+          if (r && typeof r.durationMs === 'number') addTrack(id, { durationMs: r.durationMs });
         }
       }
     }
-    return map;
+    // Треки подменённого альбома без своей обложки берут обложку альбома.
+    for (const a of albums.values()) {
+      if (!a.coverUri || !Array.isArray(a.volumes)) continue;
+      for (const ref of a.volumes.flat()) {
+        const id = String(ref && ref.id);
+        if (isId(id) && !(tracks.get(id) || {}).coverUri) addTrack(id, { coverUri: a.coverUri });
+      }
+    }
+    return { files, tracks, albums, artists, inserts };
   };
   const fetchUncensor = async () => {
-    // no-cache, а не no-store: браузер переспрашивает с ETag, и неизменный список приходит
-    // ответом 304 без тела.
-    const r = await origFetch(UNCENSOR_LIST, { cache: 'no-cache' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const list = await r.json();
+    let lastErr;
+    // Сначала зеркало, которое сработало в прошлый раз.
+    for (const i of [ucMirror, ...UC_MIRRORS.keys()].filter((v, k, a) => a.indexOf(v) === k)) {
+      try {
+        // no-cache, а не no-store: браузер переспрашивает с ETag, и неизменный список
+        // приходит ответом 304 без тела.
+        const r = await origFetch(`${UC_MIRRORS[i]}list_v2.json`, { cache: 'no-cache', signal: AbortSignal.timeout(15000) });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const list = await r.json();
+        ucMirror = i;
+        try {
+          localStorage.setItem('tune:uncensor', JSON.stringify({ at: Date.now(), mirror: i, list }));
+        } catch (e) {}
+        uc = parseUncensor(list);
+        uncensorAt = Date.now();
+        badgesDirty = true;
+        return uc;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr;
+  };
+  const readUncensorCache = () => {
+    if (uc) return;
     try {
-      localStorage.setItem('tune:uncensor', JSON.stringify({ at: Date.now(), list }));
+      const cached = JSON.parse(localStorage.getItem('tune:uncensor') || 'null');
+      if (!cached || !cached.list) return;
+      uc = parseUncensor(cached.list);
+      uncensorAt = cached.at || 0;
+      ucMirror = UC_MIRRORS[cached.mirror] ? cached.mirror : 0;
+      badgesDirty = true;
     } catch (e) {}
-    uncensorMap = parseUncensor(list);
-    uncensorAt = Date.now();
-    badgesDirty = true;
-    return uncensorMap;
   };
   // Свежий список — сразу; устаревший — отдаём, а новый качаем в фоне.
   const loadUncensor = () => {
-    if (uncensorMap && Date.now() - uncensorAt < UNCENSOR_TTL) return Promise.resolve(uncensorMap);
-    if (uncensorLoading) return uncensorMap ? Promise.resolve(uncensorMap) : uncensorLoading;
-    uncensorLoading = (async () => {
-      if (!uncensorMap) {
-        let cached = null;
-        try {
-          cached = JSON.parse(localStorage.getItem('tune:uncensor') || 'null');
-        } catch (e) {}
-        if (cached && cached.list) {
-          uncensorMap = parseUncensor(cached.list);
-          uncensorAt = cached.at || 0;
-          badgesDirty = true;
-          if (Date.now() - uncensorAt < UNCENSOR_TTL) return uncensorMap;
-        }
-      }
-      try {
-        return await fetchUncensor();
-      } catch (e) {
-        console.warn('[tune] список FckCensor', e);
-        uncensorAt = Date.now() - UNCENSOR_TTL + 10 * 60 * 1000; // повтор через 10 минут
-        return uncensorMap || new Map();
-      }
-    })().finally(() => (uncensorLoading = null));
-    return uncensorMap ? Promise.resolve(uncensorMap) : uncensorLoading;
+    readUncensorCache();
+    if (uc && Date.now() - uncensorAt < UNCENSOR_TTL) return Promise.resolve(uc);
+    if (!uncensorLoading)
+      uncensorLoading = fetchUncensor()
+        .catch((e) => {
+          console.warn('[tune] список FckCensor', e);
+          uncensorAt = Date.now() - UNCENSOR_TTL + 10 * 60 * 1000; // повтор через 10 минут
+          return uc;
+        })
+        .finally(() => (uncensorLoading = null));
+    return uc ? Promise.resolve(uc) : uncensorLoading.then((v) => v || parseUncensor(null));
   };
   // Значок «без цензуры» у названий треков из списка: в списках, поиске и плеере.
   let badgesDirty = true;
@@ -751,7 +870,7 @@
 
   const UC_TARGETS = '[data-test-id="TRACK_TITLE"], [data-test-id="VIBE_PLAYERBAR_TRACK_NAME"]';
   const mountUncensorBadges = () => {
-    if (!cfg.uncensor || !uncensorMap || !uncensorMap.size) {
+    if (!cfg.uncensor) {
       document.querySelectorAll('[data-tune="uc"]').forEach((b) => b.remove());
       return;
     }
@@ -769,7 +888,7 @@
         }
         id = el.dataset.tuneUcId;
       }
-      const has = !!id && uncensorMap.has(id);
+      const has = !!ucFile(id);
       const parent = el.parentElement;
       let badge = parent && parent.querySelector(':scope > [data-tune="uc"], :scope > [class*="explicitMarkContainer"] > [data-tune="uc"]');
       if (!has) {
@@ -781,48 +900,1074 @@
     }
     badgesDirty = false;
   };
-  const uncensoredInfo = (info, url) => ({
-    ...info,
-    codec: 'mp3',
-    bitrate: 320,
-    transport: 'raw',
-    key: undefined,
-    urls: [url],
-    url,
-  });
+
+  // ---------------------------------------------------------------------------
+  // API Яндекса от имени клиента: заголовки (авторизацию) берём у его же последнего
+  // запроса. Ответы — без подмены: окну подмены нужны исходные данные.
+  // ---------------------------------------------------------------------------
+  let apiHeaders = null;
+  let apiBase = 'https://api.music.yandex.net/';
+  let myUid = '';
+  const apiFetch = async (path, init = {}) => {
+    const headers = new Headers(apiHeaders || undefined);
+    headers.delete('content-type');
+    headers.delete('content-length');
+    const r = await origFetch(apiBase + path, { ...init, headers, credentials: 'include' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    return j && typeof j === 'object' && 'result' in j && 'invocationInfo' in j ? j.result : j;
+  };
+  const apiTracks = async (ids) => {
+    const out = [];
+    for (let i = 0; i < ids.length; i += 250) {
+      const form = new FormData();
+      for (const id of ids.slice(i, i + 250)) form.append('trackIds', id);
+      const got = await apiFetch('tracks', { method: 'POST', body: form });
+      if (Array.isArray(got)) out.push(...got);
+    }
+    return out;
+  };
+  const apiAlbums = async (ids) => (ids.length ? (await apiFetch(`albums?albumIds=${ids.join(',')}`)) || [] : []);
+  const uidOf = async () => {
+    if (myUid) return myUid;
+    const s = await apiFetch('account/status');
+    myUid = String((s && s.account && s.account.uid) || '');
+    return myUid;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Ручная подмена — пункт «Подменить трек / альбом / исполнителя» в меню «…».
+  // Окно как у FckCensor: название, исполнители, обложка, свой аудиофайл, список треков
+  // альбома, треки и альбомы в профиле исполнителя, автоподмена из списка и поля JSON.
+  // ---------------------------------------------------------------------------
+  const EDIT_SPRITE = '/icons/sprite.svg#edit_xxs';
+  const TYPE_WORD = { track: 'трек', album: 'альбом', artist: 'исполнителя' };
+  let albumMenu = null;
+  let artistMenu = null;
+  // Альбом или исполнитель, у которого открыли «…»: из свойств React у кнопки, из ссылки
+  // рядом или из адреса страницы (кнопка в шапке).
+  const entityOfButton = (btn, kind) => {
+    const key = Object.keys(btn).find((k) => k.startsWith('__reactFiber'));
+    let f = key && btn[key];
+    for (let i = 0; f && i < 40; i++, f = f.return) {
+      const p = f.memoizedProps;
+      if (!p || typeof p !== 'object') continue;
+      for (const v of [p[kind], p.entity, p.data, p.meta]) {
+        if (v && typeof v === 'object' && v.id != null && /^\d+$/.test(String(v.id)) && (kind === 'artist' ? typeof v.name === 'string' : typeof v.title === 'string'))
+          return { id: String(v.id), name: kind === 'artist' ? v.name : v.title };
+      }
+    }
+    const param = kind === 'album' ? 'albumId' : 'artistId';
+    let el = btn;
+    for (let i = 0; el && i < 8; i++, el = el.parentElement) {
+      const a = el.querySelector(`a[href*="${param}="]`);
+      const m = a && a.getAttribute('href').match(new RegExp(`${param}=(\\d+)`));
+      if (m) return { id: m[1], name: '' };
+    }
+    const m = location.search.match(new RegExp(`${param}=(\\d+)`));
+    return m ? { id: m[1], name: '' } : null;
+  };
+  for (const type of ['pointerdown', 'keydown']) {
+    document.addEventListener(
+      type,
+      (e) => {
+        if (!(e.target instanceof Element)) return;
+        const al = e.target.closest('[data-test-id="ALBUM_CONTEXT_MENU_BUTTON"], [data-test-id="ALBUM_HEADER_CONTEXT_MENU_BUTTON"]');
+        if (al) albumMenu = { at: performance.now(), entity: entityOfButton(al, 'album') };
+        const ar = e.target.closest('[data-test-id="ARTIST_CONTEXT_MENU_BUTTON"], [data-test-id="ARTIST_HEADER_CONTEXT_MENU_BUTTON"]');
+        if (ar) artistMenu = { at: performance.now(), entity: entityOfButton(ar, 'artist') };
+      },
+      true
+    );
+  }
+  const mountSpoofMenuItem = () => {
+    if (!cfg.uncensor) return;
+    const menu = document.querySelector('[role="menu"]');
+    if (!menu || menu.querySelector('[data-tune="spoof-menu"]')) return;
+    const now = performance.now();
+    let type = null;
+    let id = null;
+    if (now - listMenuAt < 2000 && listMenuTrack) [type, id] = ['track', listMenuTrack.id];
+    else if (now - playerMenuAt < 2000 && ym.meta()) [type, id] = ['track', ym.meta().id];
+    else if (albumMenu && now - albumMenu.at < 2000 && albumMenu.entity) [type, id] = ['album', albumMenu.entity.id];
+    else if (artistMenu && now - artistMenu.at < 2000 && artistMenu.entity) [type, id] = ['artist', artistMenu.entity.id];
+    if (!type || id == null || !/^\d+$/.test(String(id))) return; // свои загруженные треки (uuid) не подменяются
+    const items = [...menu.querySelectorAll('[role="menuitem"]')].filter((i) => !i.dataset.tune);
+    const ref = menu.querySelector('[data-test-id="TRACK_CONTEXT_MENU_ABOUT_TRACK_BUTTON"], [data-test-id="ARTIST_CONTEXT_MENU_ABOUT_ARTIST_BUTTON"]') || items.pop();
+    if (!ref) return;
+    const item = menuItem(menu, ref, 'spoof-menu', EDIT_SPRITE, `Подменить ${TYPE_WORD[type]}`, () => openSpoofEditor(type, String(id)));
+    if (ref.dataset.testId && /ABOUT/.test(ref.dataset.testId)) ref.before(item);
+    else ref.after(item);
+  };
+
+  const spoofSheet = new CSSStyleSheet();
+  spoofSheet.replaceSync(`
+    #tune-spoof { position: fixed; inset: 0; z-index: 2147482000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); animation: tune-sp-fade .2s; }
+    @keyframes tune-sp-fade { from { opacity: 0; } }
+    #tune-spoof .tsp-card { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; border-radius: var(--ym-radius-size-xl, 16px);
+      background: var(--ym-background-color-primary-enabled-popover, var(--ym-background-color-primary-enabled-basic, #1f1f1f)); color: var(--ym-controls-color-primary-text-enabled_variant, #fff);
+      box-shadow: 0 24px 64px rgba(0,0,0,.5); font-family: var(--ym-font-text, system-ui, sans-serif); font-size: 14px; animation: tune-ly-in .25s cubic-bezier(.2,.8,.2,1); }
+    #tune-spoof .tsp-head { display: flex; align-items: center; gap: 12px; padding: 20px 24px 12px; }
+    #tune-spoof h2 { flex: 1; margin: 0; font-size: 20px; font-weight: 700; }
+    #tune-spoof .tsp-body { overflow-y: auto; padding: 4px 24px 16px; display: flex; flex-direction: column; gap: 16px; }
+    #tune-spoof .tsp-top { display: grid; grid-template-columns: 112px 1fr; gap: 16px; align-items: start; }
+    #tune-spoof .tsp-cover { position: relative; width: 112px; height: 112px; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,.08); }
+    #tune-spoof .tsp-cover.tsp-round { border-radius: 50%; }
+    #tune-spoof .tsp-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #tune-spoof .tsp-cover img:not([src]), #tune-spoof .tsp-cover img[src=""] { visibility: hidden; }
+    #tune-spoof .tsp-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    #tune-spoof label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; opacity: .85; }
+    #tune-spoof .tsp-label { font-size: 12px; opacity: .6; }
+    #tune-spoof input[type="text"], #tune-spoof textarea { width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 9px 12px; background: rgba(255,255,255,.06); color: inherit; font: inherit; font-size: 14px; outline: none; }
+    #tune-spoof input[type="text"]:focus, #tune-spoof textarea:focus { border-color: var(--ym-controls-color-primary-text-enabled, #fc3); }
+    #tune-spoof textarea { min-height: 120px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; resize: vertical; }
+    #tune-spoof .tsp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    #tune-spoof .tsp-note { font-size: 12px; opacity: .6; line-height: 1.4; }
+    #tune-spoof button.tsp-btn { border: 0; border-radius: 100px; padding: 8px 14px; background: rgba(255,255,255,.1); color: inherit; font: 500 13px/1 var(--ym-font-text, system-ui); cursor: pointer; transition: background-color .15s, transform .15s; }
+    #tune-spoof button.tsp-btn:hover { background: rgba(255,255,255,.18); }
+    #tune-spoof button.tsp-btn:active { transform: scale(.97); }
+    #tune-spoof button.tsp-btn:disabled { opacity: .4; pointer-events: none; }
+    #tune-spoof button.tsp-primary { background: var(--ym-controls-color-primary-text-enabled, #fc3); color: #000; }
+    #tune-spoof button.tsp-primary:hover { background: var(--ym-controls-color-primary-text-hovered, #ffd84d); }
+    #tune-spoof button.tsp-icon { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+    #tune-spoof .tsp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 6px 5px 12px; border-radius: 100px; background: rgba(255,255,255,.1); font-size: 13px; }
+    #tune-spoof .tsp-chip button { border: 0; background: none; color: inherit; opacity: .6; cursor: pointer; font-size: 14px; padding: 0 4px; }
+    #tune-spoof .tsp-search { position: relative; }
+    #tune-spoof .tsp-sugg { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 2; max-height: 240px; overflow-y: auto; border-radius: 10px; background: var(--ym-background-color-primary-enabled-popover, #262626); box-shadow: 0 12px 32px rgba(0,0,0,.5); }
+    #tune-spoof .tsp-sugg:empty { display: none; }
+    #tune-spoof .tsp-opt { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; }
+    #tune-spoof .tsp-opt:hover, #tune-spoof .tsp-opt.tsp-active { background: rgba(255,255,255,.08); }
+    #tune-spoof .tsp-opt img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; flex: none; background: rgba(255,255,255,.08); }
+    #tune-spoof .tsp-opt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #tune-spoof .tsp-opt small { opacity: .55; }
+    #tune-spoof .tsp-list { display: flex; flex-direction: column; border-radius: 10px; background: rgba(255,255,255,.04); max-height: 280px; overflow-y: auto; }
+    #tune-spoof .tsp-list:empty::before { content: attr(data-empty); padding: 12px; opacity: .5; font-size: 13px; }
+    #tune-spoof .tsp-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; }
+    #tune-spoof .tsp-item + .tsp-item { border-top: 1px solid rgba(255,255,255,.05); }
+    #tune-spoof .tsp-item .tsp-n { width: 22px; flex: none; opacity: .5; font-variant-numeric: tabular-nums; }
+    #tune-spoof .tsp-item .tsp-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #tune-spoof .tsp-item .tsp-t small { opacity: .55; }
+    #tune-spoof .tsp-item .tsp-new { color: var(--ym-controls-color-primary-text-enabled, #fc3); }
+    #tune-spoof .tsp-item button { border: 0; background: none; color: inherit; opacity: .55; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; }
+    #tune-spoof .tsp-item button:hover { opacity: 1; background: rgba(255,255,255,.1); }
+    #tune-spoof .tsp-disc { padding: 8px 12px 4px; font-size: 12px; opacity: .55; }
+    #tune-spoof .tsp-switch { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; opacity: 1; cursor: pointer; }
+    #tune-spoof .tsp-switch input { width: 18px; height: 18px; accent-color: var(--ym-controls-color-primary-text-enabled, #fc3); }
+    #tune-spoof details summary { cursor: pointer; font-size: 13px; opacity: .7; }
+    #tune-spoof details[open] summary { margin-bottom: 8px; }
+    #tune-spoof .tsp-foot { display: flex; align-items: center; gap: 8px; padding: 12px 24px 20px; }
+    #tune-spoof .tsp-foot .tsp-gap { flex: 1; }
+    #tune-spoof .tsp-loading { padding: 40px; text-align: center; opacity: .6; }
+    .tune-toast.tune-task.tune-notice { width: min(400px, 86vw); padding: 12px 14px; }
+    .tune-toast.tune-task.tune-notice .tune-toast-body { display: flex; align-items: flex-start; gap: 12px; }
+    .tune-toast.tune-task.tune-notice .tune-toast-bar { display: none; }
+    .tune-toast.tune-task.tune-notice .tune-toast-text { display: flex; flex-direction: column; gap: 3px; white-space: normal; font-weight: 600; line-height: 1.35; }
+    .tune-toast.tune-task.tune-notice .tune-notice-sub { font-weight: 400; font-size: 12px; opacity: .65; }
+    .tune-toast.tune-task.tune-notice .tune-toast-info { display: none; }
+    .tune-toast.tune-task.tune-notice img { width: 40px; height: 40px; border-radius: 6px; flex: none; }
+    .tune-toast.tune-task.tune-notice .tune-toast-text { flex: 1; min-width: 0; }
+  `);
+  const h = (tag, props, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else if (k === 'class') el.className = v;
+      else if (k in el && k !== 'list') el[k] = v;
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid);
+    return el;
+  };
+  const coverSrc = (uri, size = '200x200') => (uri ? `https://${String(uri).replace(/^https?:\/\//, '').replace('%%', size)}` : '');
+  const namesOf = (list) => (list || []).map((a) => a && a.name).filter(Boolean).join(', ');
+  const readB64 = (file) =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1] || '');
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+  const pickFile = (accept) =>
+    new Promise((resolve) => {
+      const input = h('input', { type: 'file', accept, style: 'display:none' });
+      input.addEventListener('change', () => resolve(input.files[0] || null));
+      document.body.append(input);
+      input.click();
+      setTimeout(() => input.remove(), 60000);
+    });
+  const saveSpoofFile = async (file) => {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    return T.invoke('page_spoof_save', { ext, data: await readB64(file) });
+  };
+  const audioDuration = (file) =>
+    new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const a = new Audio();
+      const done = (v) => {
+        URL.revokeObjectURL(url);
+        resolve(v);
+      };
+      a.preload = 'metadata';
+      a.onloadedmetadata = () => done(Number.isFinite(a.duration) ? Math.round(a.duration * 1000) : 0);
+      a.onerror = () => done(0);
+      a.src = url;
+    });
+  // id из ссылки или числа: «…albumId=1&trackId=2», «/track/2», «2».
+  const idFromText = (text, kind) => {
+    const t = String(text || '').trim();
+    const param = { track: 'trackId', album: 'albumId', artist: 'artistId' }[kind];
+    const m = t.match(new RegExp(`${param}=(\\d+)`)) || t.match(new RegExp(`/${kind}/(\\d+)(?:[/?#]|$)`)) || t.match(/^(\d+)$/);
+    return m ? m[1] : null;
+  };
+  // Поле поиска с подсказками: исполнители, треки или альбомы Яндекса; ссылка или id — сразу.
+  const searchField = (kind, placeholder, onPick) => {
+    const sugg = h('div', { class: 'tsp-sugg' });
+    const input = h('input', { type: 'text', placeholder });
+    let timer = 0;
+    let seq = 0;
+    let active = -1;
+    const options = () => [...sugg.children];
+    const setActive = (i) => {
+      const list = options();
+      active = Math.max(-1, Math.min(list.length - 1, i));
+      list.forEach((o, k) => o.classList.toggle('tsp-active', k === active));
+    };
+    const pick = (entity) => {
+      sugg.textContent = '';
+      input.value = '';
+      onPick(entity);
+    };
+    const run = async () => {
+      const text = input.value.trim();
+      const my = ++seq;
+      if (!text) return (sugg.textContent = '');
+      const id = idFromText(text, kind);
+      let found = [];
+      try {
+        if (id) {
+          if (kind === 'track') found = await apiTracks([id]);
+          else if (kind === 'album') found = await apiAlbums([id]);
+          else found = [(await apiFetch(`artists/${id}/brief-info`)).artist];
+        } else {
+          const res = await apiFetch(`search?text=${encodeURIComponent(text)}&type=${kind}&page=0&nocorrect=false`);
+          found = ((res && res[`${kind}s`] && res[`${kind}s`].results) || []).slice(0, 8);
+        }
+      } catch (e) {
+        found = [];
+      }
+      if (my !== seq) return;
+      sugg.textContent = '';
+      active = -1;
+      for (const e of found.filter(Boolean)) {
+        const cover = kind === 'artist' ? e.cover && e.cover.uri : e.coverUri || (e.albums && e.albums[0] && e.albums[0].coverUri);
+        const sub = kind === 'artist' ? (e.genres || []).slice(0, 2).join(', ') : `${namesOf(e.artists)}${kind === 'album' && e.year ? ` · ${e.year}` : ''}`;
+        sugg.append(h('div', { class: 'tsp-opt', onmousedown: (ev) => (ev.preventDefault(), pick(e)) }, h('img', { src: coverSrc(cover, '50x50') }), h('span', {}, kind === 'artist' ? e.name : e.title, ' ', h('small', {}, sub))));
+      }
+      if (!found.length) sugg.append(h('div', { class: 'tsp-opt' }, h('span', {}, h('small', {}, 'Ничего не нашлось'))));
+    };
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(run, 280);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') setActive(active + 1);
+      else if (e.key === 'ArrowUp') setActive(active - 1);
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        const o = options()[active < 0 ? 0 : active];
+        if (o) o.dispatchEvent(new MouseEvent('mousedown'));
+      } else return;
+      e.preventDefault();
+    });
+    input.addEventListener('blur', () => setTimeout(() => (sugg.textContent = ''), 150));
+    return h('div', { class: 'tsp-search' }, input, sugg);
+  };
+  // Список сущностей с порядком (треки альбома, вставки исполнителя).
+  const entityList = (kind, items, empty, { discs = false } = {}) => {
+    const box = h('div', { class: 'tsp-list', 'data-empty': empty });
+    const render = () => {
+      box.textContent = '';
+      let disc = null;
+      items.forEach((it, i) => {
+        if (discs && items.some((x) => x.disc !== items[0].disc) && it.disc !== disc) box.append(h('div', { class: 'tsp-disc' }, `Диск ${it.disc + 1}`));
+        disc = it.disc;
+        const move = (d) => {
+          const j = i + d;
+          if (j < 0 || j >= items.length) return;
+          [items[i], items[j]] = [items[j], items[i]];
+          if (discs) [items[i].disc, items[j].disc] = [items[j].disc, items[i].disc];
+          render();
+        };
+        box.append(
+          h(
+            'div',
+            { class: 'tsp-item', 'data-id': it.id },
+            h('span', { class: 'tsp-n' }, String(i + 1)),
+            h('span', { class: 'tsp-t' }, h('span', { class: it.added ? 'tsp-new' : '' }, it.title || `id ${it.id}`), ' ', h('small', {}, it.sub || '')),
+            h('button', { title: 'Выше', onclick: () => move(-1) }, '↑'),
+            h('button', { title: 'Ниже', onclick: () => move(1) }, '↓'),
+            h('button', { title: 'Убрать', onclick: () => (items.splice(i, 1), render()) }, '✕')
+          )
+        );
+      });
+    };
+    render();
+    const add = (e) => {
+      const id = String(e.id);
+      if (items.some((x) => x.id === id)) return T.toast('Уже в списке');
+      items.push({ id, title: e.title || e.name, sub: namesOf(e.artists), added: true, disc: items.length ? items[items.length - 1].disc : 0 });
+      render();
+      box.scrollTop = box.scrollHeight;
+    };
+    return { el: box, add, render };
+  };
+
+  let spoofOpen = null;
+  const closeSpoof = () => {
+    if (spoofOpen) spoofOpen.remove();
+    spoofOpen = null;
+  };
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key === 'Escape' && spoofOpen && !e.defaultPrevented) {
+        e.stopPropagation();
+        closeSpoof();
+      }
+    },
+    true
+  );
+  const openSpoofEditor = async (type, id) => {
+    if (!document.adoptedStyleSheets.includes(spoofSheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, spoofSheet];
+    closeSpoof();
+    const title = `Подмена ${type === 'track' ? 'трека' : type === 'album' ? 'альбома' : 'исполнителя'}`;
+    const body = h('div', { class: 'tsp-body' }, h('div', { class: 'tsp-loading' }, 'Загрузка…'));
+    const foot = h('div', { class: 'tsp-foot' });
+    const card = h('div', { class: 'tsp-card', role: 'dialog', 'aria-label': title }, h('div', { class: 'tsp-head' }, h('h2', {}, title), h('button', { class: 'tsp-btn tsp-icon', title: 'Закрыть', onclick: closeSpoof }, '✕')), body, foot);
+    const root = h('div', { id: 'tune-spoof', onmousedown: (e) => e.target === root && closeSpoof() }, card);
+    document.body.append(root);
+    spoofOpen = root;
+    await loadUncensor();
+
+    // Исходные данные Яндекса и то, что сейчас стоит поверх них.
+    let raw;
+    try {
+      if (type === 'track') raw = (await apiTracks([id]))[0];
+      else if (type === 'album') raw = await apiFetch(`albums/${id}/with-tracks?richTracks=true`);
+      else raw = (await apiFetch(`artists/${id}/brief-info`)).artist;
+    } catch (e) {
+      raw = null;
+    }
+    if (!raw || spoofOpen !== root) {
+      if (spoofOpen === root) body.firstChild.textContent = 'Не удалось получить данные из Яндекса — проверьте сеть и попробуйте ещё раз.';
+      return;
+    }
+    const nameKey = type === 'artist' ? 'name' : 'title';
+    const auto = autoSpoof(type, id) || {};
+    const mine = own[type][id] || {};
+    const base = { ...raw, ...auto }; // без своих полей
+    const cur = { ...base, ...spoofOf(type, id) };
+    const rawCover = type === 'artist' ? raw.cover && raw.cover.uri : raw.coverUri;
+    const curCover = cur.coverUri || rawCover;
+    const state = {
+      name: cur[nameKey] || '',
+      cover: curCover || '',
+      artists: (cur.artists || []).map((a) => ({ id: String(a.id), name: a.name })),
+      audio: mine.audio || null,
+      durationMs: mine.durationMs,
+      noAuto: !!mine.noAuto,
+    };
+
+    // Обложка и название.
+    const img = h('img', { src: coverSrc(state.cover) });
+    const setCover = (uri) => {
+      state.cover = uri;
+      img.src = coverSrc(uri);
+    };
+    const coverUrl = h('input', { type: 'text', placeholder: 'Ссылка на картинку', style: 'display:none' });
+    coverUrl.addEventListener('change', () => {
+      const v = coverUrl.value.trim();
+      if (v) setCover(v.replace(/^https?:\/\//, ''));
+    });
+    const nameInput = h('input', { type: 'text', value: state.name });
+    body.textContent = '';
+    body.append(
+      h(
+        'div',
+        { class: 'tsp-top' },
+        h('div', { class: `tsp-cover${type === 'artist' ? ' tsp-round' : ''}` }, img),
+        h(
+          'div',
+          { class: 'tsp-col' },
+          h('label', {}, type === 'artist' ? 'Имя исполнителя' : 'Название', nameInput),
+          h(
+            'div',
+            { class: 'tsp-row' },
+            h(
+              'button',
+              {
+                class: 'tsp-btn',
+                onclick: async () => {
+                  const file = await pickFile('image/png,image/jpeg,image/webp,image/gif,image/avif');
+                  if (!file) return;
+                  try {
+                    setCover(`${location.host}/__tune/spoof/${await saveSpoofFile(file)}?s=%%`);
+                  } catch (e) {
+                    T.toast(String(e), { error: true });
+                  }
+                },
+              },
+              'Обложка из файла…'
+            ),
+            h('button', { class: 'tsp-btn', onclick: () => ((coverUrl.style.display = ''), coverUrl.focus()) }, 'По ссылке'),
+            h('button', { class: 'tsp-btn', onclick: () => setCover(base.coverUri || rawCover || '') }, 'Исходная')
+          ),
+          coverUrl
+        )
+      )
+    );
+
+    // Исполнители трека или альбома.
+    let renderArtists = null;
+    let refreshAudio = () => {};
+    if (type !== 'artist') {
+      const chips = h('div', { class: 'tsp-row' });
+      renderArtists = () => {
+        chips.textContent = '';
+        state.artists.forEach((a, i) => chips.append(h('span', { class: 'tsp-chip' }, a.name, h('button', { title: 'Убрать', onclick: () => (state.artists.splice(i, 1), renderArtists()) }, '✕'))));
+      };
+      renderArtists();
+      body.append(
+        h(
+          'div',
+          { class: 'tsp-col' },
+          h('span', { class: 'tsp-label' }, 'Исполнители'),
+          chips,
+          searchField('artist', 'Добавить исполнителя: имя или ссылка', (a) => {
+            if (!state.artists.some((x) => x.id === String(a.id))) state.artists.push({ id: String(a.id), name: a.name });
+            renderArtists();
+          })
+        )
+      );
+    }
+
+    // Аудио трека.
+    if (type === 'track') {
+      const status = h('span', { class: 'tsp-note' });
+      const fileBtn = h('button', { class: 'tsp-btn' });
+      const renderAudio = () => {
+        const autoFile = uc && uc.files.has(id) && !state.noAuto;
+        status.textContent = state.audio ? `Свой файл: ${state.audio.name || state.audio.file}` : autoFile ? 'Играет версия без цензуры из списка FckCensor' : 'Играет файл Яндекса';
+        fileBtn.textContent = state.audio ? 'Убрать свой файл' : 'Свой аудиофайл…';
+      };
+      fileBtn.addEventListener('click', async () => {
+        if (state.audio) {
+          state.audio = null;
+          state.durationMs = undefined;
+          return renderAudio();
+        }
+        const file = await pickFile('audio/*,.mp3,.flac,.ogg,.opus,.wav,.m4a,.aac');
+        if (!file) return;
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        if (!AUDIO_CODECS[ext]) return T.toast('Нужен файл mp3, flac, ogg, opus, wav или m4a', { error: true });
+        fileBtn.disabled = true;
+        status.textContent = 'Сохранение…';
+        try {
+          const [name, durationMs] = await Promise.all([saveSpoofFile(file), audioDuration(file)]);
+          state.audio = { file: name, codec: AUDIO_CODECS[ext], name: file.name };
+          state.durationMs = durationMs || undefined;
+        } catch (e) {
+          T.toast(String(e), { error: true });
+        }
+        fileBtn.disabled = false;
+        renderAudio();
+      });
+      renderAudio();
+      refreshAudio = renderAudio;
+      body.append(h('div', { class: 'tsp-col' }, h('span', { class: 'tsp-label' }, 'Аудио'), h('div', { class: 'tsp-row' }, fileBtn, status)));
+    }
+
+    // Список треков альбома.
+    let albumList = null;
+    if (type === 'album') {
+      const rawVolumes = (raw.volumes || []).map((v) => v.map((t) => String(t.id)));
+      const volumes = cur.volumes ? cur.volumes.map((v) => v.map((t) => String(t && typeof t === 'object' ? t.id : t))) : rawVolumes;
+      const known = new Map((raw.volumes || []).flat().map((t) => [String(t.id), t]));
+      const missing = [...new Set(volumes.flat())].filter((x) => !known.has(x));
+      try {
+        for (const t of await apiTracks(missing)) known.set(String(t.id), t);
+      } catch (e) {}
+      const rawSet = new Set(rawVolumes.flat());
+      const items = [];
+      volumes.forEach((v, disc) =>
+        v.forEach((tid) => {
+          const t = known.get(tid) || {};
+          const s = spoofOf('track', tid) || {};
+          items.push({ id: tid, title: s.title || t.title, sub: namesOf(s.artists || t.artists), added: !rawSet.has(tid), disc });
+        })
+      );
+      albumList = { items, rawVolumes, ...entityList('track', items, 'В альбоме нет треков', { discs: true }) };
+      body.append(
+        h(
+          'div',
+          { class: 'tsp-col' },
+          h('span', { class: 'tsp-label' }, 'Треки альбома — новые подсвечены'),
+          albumList.el,
+          searchField('track', 'Добавить трек: название или ссылка на трек', (t) => albumList.add(t)),
+          h('button', { class: 'tsp-btn', style: 'align-self:flex-start', onclick: () => (items.splice(0, items.length, ...rawVolumes.flatMap((v, disc) => v.map((tid) => ({ id: tid, title: (known.get(tid) || {}).title, sub: namesOf((known.get(tid) || {}).artists), disc })))), albumList.render()) }, 'Как в Яндексе')
+        )
+      );
+    }
+
+    // Треки и альбомы в профиле исполнителя.
+    let artistLists = null;
+    if (type === 'artist') {
+      const ins = insertsOf(id) || { tracks: [], albums: [] };
+      const [tr, al] = await Promise.all([apiTracks(ins.tracks || []).catch(() => []), apiAlbums(ins.albums || []).catch(() => [])]);
+      const toItem = (e) => ({ id: String(e.id), title: e.title, sub: namesOf(e.artists) });
+      const tracks = entityList('track', tr.map(toItem), 'Не добавлено ни одного трека');
+      const albums = entityList('album', al.map(toItem), 'Не добавлено ни одного альбома');
+      artistLists = { tracks, albums, initial: JSON.stringify({ tracks: ins.tracks || [], albums: ins.albums || [] }) };
+      body.append(
+        h('div', { class: 'tsp-col' }, h('span', { class: 'tsp-label' }, 'Треки в профиле — сверху «Популярных треков»'), tracks.el, searchField('track', 'Добавить трек: название или ссылка', (t) => tracks.add(t))),
+        h('div', { class: 'tsp-col' }, h('span', { class: 'tsp-label' }, 'Альбомы в профиле'), albums.el, searchField('album', 'Добавить альбом: название или ссылка', (a) => albums.add(a)))
+      );
+    }
+
+    // Автоподмена из списка.
+    const hasAuto = !!(uc && (uc[AUTO_MAPS[type]].has(id) || (type === 'track' && uc.files.has(id)) || (type === 'artist' && uc.inserts.has(id))));
+    if (hasAuto) {
+      // Трек, удалённый из Яндекса, без автоподмены снова пропадёт — вместе с этим окном.
+      const locked = type === 'track' && raw.available === false && uc.files.has(id);
+      if (locked) state.noAuto = false;
+      const box = h('input', { type: 'checkbox', checked: !state.noAuto, disabled: locked });
+      box.addEventListener('change', () => {
+        state.noAuto = !box.checked;
+        refreshAudio();
+      });
+      const note = locked
+        ? 'Трек удалён из Яндекса и играет только благодаря списку — без автоподмены он пропадёт, поэтому её не выключить. Свою версию можно поставить кнопкой «Свой аудиофайл…».'
+        : 'Выключите, если версия из списка не нравится: останутся только ваши правки.';
+      body.append(h('label', { class: 'tsp-switch' }, h('span', {}, 'Автоподмена из списка FckCensor', h('br'), h('small', { class: 'tsp-note' }, note)), box));
+    }
+
+    // Дополнительные поля — JSON своих полей, как «Дополнительные поля» у FckCensor.
+    const extraKeys = (o) => {
+      const { title, name, artists, coverUri, audio, durationMs, noAuto, volumes, insert, ...rest } = o || {};
+      return rest;
+    };
+    const json = h('textarea', { spellcheck: false, value: JSON.stringify(extraKeys(mine), null, 2) });
+    body.append(
+      h(
+        'details',
+        {},
+        h('summary', {}, 'Дополнительные поля (JSON)'),
+        h('div', { class: 'tsp-note', style: 'margin-bottom:8px' }, 'Любые поля объекта Яндекса, например { "releaseDate": "2020-01-01T00:00:00+03:00", "contentWarning": "explicit" }.'),
+        json
+      )
+    );
+
+    // Сохранение: в свои поля попадает только то, что отличается от Яндекса со списком.
+    const apply = () => {
+      let extra = {};
+      try {
+        extra = JSON.parse(json.value.trim() || '{}');
+        if (!extra || typeof extra !== 'object' || Array.isArray(extra)) throw new Error();
+      } catch (e) {
+        return T.toast('В дополнительных полях — неверный JSON', { error: true });
+      }
+      const next = { ...extra };
+      const nm = nameInput.value.trim();
+      if (nm && nm !== base[nameKey]) next[nameKey] = nm;
+      if (state.cover && state.cover !== (base.coverUri || rawCover)) next.coverUri = state.cover;
+      if (type !== 'artist') {
+        const ids = state.artists.map((a) => a.id).join(',');
+        if (ids !== (base.artists || []).map((a) => String(a.id)).join(',') && state.artists.length) next.artists = state.artists.map((a) => ({ id: Number(a.id) || a.id, name: a.name }));
+      }
+      if (type === 'track') {
+        if (state.audio) next.audio = state.audio;
+        if (state.audio && state.durationMs) next.durationMs = state.durationMs;
+      }
+      if (albumList) {
+        const vols = [];
+        for (const it of albumList.items) (vols[it.disc] = vols[it.disc] || []).push({ id: Number(it.id) });
+        const volumes = vols.filter((v) => v && v.length);
+        const baseVols = (base.volumes ? base.volumes.map((v) => v.map((t) => String(t && typeof t === 'object' ? t.id : t))) : albumList.rawVolumes).map((v) => v.join(',')).join('|');
+        if (volumes.map((v) => v.map((t) => t.id).join(',')).join('|') !== baseVols) next.volumes = volumes;
+      }
+      if (artistLists) {
+        const insert = { tracks: collectIds(artistLists.tracks.el), albums: collectIds(artistLists.albums.el) };
+        if (JSON.stringify(insert) !== artistLists.initial) next.insert = insert;
+      }
+      if (state.noAuto) next.noAuto = true;
+      const had = !!own[type][id];
+      const prevAudio = mine.audio && mine.audio.file;
+      if (Object.keys(next).length) own[type][id] = next;
+      else delete own[type][id];
+      if (!saveOwn()) return;
+      if (prevAudio && (!next.audio || next.audio.file !== prevAudio) && !Object.values(own.track).some((o) => o.audio && o.audio.file === prevAudio))
+        T.invoke('page_spoof_remove', { name: prevAudio }).catch(() => {});
+      closeSpoof();
+      spoofChanged(type, id, Object.keys(next).length ? 'Подмена сохранена' : had ? 'Подмена удалена' : 'Изменений нет', coverSrc(state.cover, '100x100'));
+    };
+    // Порядок в списке — по id из строк, которые нарисовал entityList.
+    const collectIds = (listEl) => [...listEl.querySelectorAll('.tsp-item')].map((row) => row.dataset.id).filter(Boolean);
+    const remove = () => {
+      if (!own[type][id]) return closeSpoof();
+      const prevAudio = own[type][id].audio && own[type][id].audio.file;
+      delete own[type][id];
+      if (!saveOwn()) return;
+      if (prevAudio && !Object.values(own.track).some((o) => o.audio && o.audio.file === prevAudio)) T.invoke('page_spoof_remove', { name: prevAudio }).catch(() => {});
+      closeSpoof();
+      spoofChanged(type, id, 'Подмена удалена', coverSrc(base.coverUri || rawCover, '100x100'));
+    };
+    foot.append(
+      h('button', { class: 'tsp-btn', disabled: !own[type][id], onclick: remove }, 'Удалить подмену'),
+      h('span', { class: 'tsp-gap' }),
+      h('button', { class: 'tsp-btn', onclick: closeSpoof }, 'Отмена'),
+      h('button', { class: 'tsp-btn tsp-primary', onclick: apply }, 'Применить')
+    );
+    nameInput.focus();
+  };
+  // Данные уже лежат в хранилищах клиента — они обновятся, когда он перечитает их из API.
+  // Играющий трек меняет файл со следующего запуска.
+  const spoofChanged = (type, id, text, cover) => {
+    badgesDirty = true;
+    mountUncensorBadges();
+    const meta = ym.meta();
+    const playing = type === 'track' && meta && String(meta.id) === id;
+    if (text === 'Изменений нет') return T.toast(text);
+    notice({
+      text,
+      sub: playing ? 'Новый файл заиграет со следующего запуска трека, название и обложка — после обновления страницы.' : 'Изменения появятся после обновления страницы.',
+      cover,
+      action: 'Обновить',
+      run: () => location.reload(),
+    });
+  };
+  // Уведомление с пояснением и кнопками: заголовок, вторая строка мельче, «Позже» и действие.
+  const notice = ({ text, sub, cover, action, run, ms = 10000 }) => {
+    if (!document.adoptedStyleSheets.includes(spoofSheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, spoofSheet];
+    const card = T.task({ text, info: '', progress: undefined, cover: cover || '' });
+    card.el.classList.add('tune-notice');
+    if (!cover) card.el.classList.add('tune-nocover');
+    if (sub) card.el.querySelector('.tune-toast-text').append(h('span', { class: 'tune-notice-sub' }, sub));
+    card.el.append(
+      h(
+        'div',
+        { class: 'tune-toast-actions' },
+        h('button', { onclick: () => card.close() }, 'Позже'),
+        action && h('button', { class: 'tune-primary', onclick: () => (card.close(), run()) }, action)
+      )
+    );
+    card.close(ms);
+    return card;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Файлы треков: get-file-info.
+  // ---------------------------------------------------------------------------
+  const uncensoredInfo = (info, file) => {
+    const { error, ...rest } = info;
+    return { ...rest, codec: file.codec, bitrate: 320, transport: 'raw', key: undefined, urls: [file.url], url: file.url, realId: rest.realId || String(rest.trackId) };
+  };
+  const jsonResponse = (body, resp) => {
+    const headers = new Headers(resp.headers);
+    headers.delete('content-length');
+    headers.delete('content-encoding');
+    headers.set('content-type', 'application/json; charset=utf-8');
+    return new Response(JSON.stringify(body), { status: 200, statusText: 'OK', headers });
+  };
   // Ответы get-file-info и get-file-info/batch: { downloadInfo } и { downloadInfos | fileInfos }.
-  const patchFileInfo = async (resp) => {
-    const map = await loadUncensor();
-    if (!map.size) return resp;
+  // Ответ с ошибкой тоже подменяем: так играют треки, которые Яндекс удалил или закрыл.
+  const patchFileInfo = async (resp, reqUrl) => {
+    await loadUncensor();
+    const fileOf = (id) => ucFile(String(id).split(':')[0]);
+    let body = null;
+    if (resp.ok) {
+      try {
+        body = await resp.clone().json();
+      } catch (e) {
+        return resp;
+      }
+    } else {
+      // Ответа нет — собираем его сами, если для всех треков запроса есть файл.
+      const q = new URL(reqUrl).searchParams;
+      const ids = (q.get('trackIds') || q.get('trackId') || '').split(',').filter(Boolean);
+      if (!ids.length || !ids.every(fileOf)) return resp;
+      const infos = ids.map((trackId) => ({ trackId, quality: q.get('quality') || 'nq', error: 'unavailable' }));
+      body = /\/batch\?/.test(reqUrl) ? { downloadInfos: infos } : { downloadInfo: infos[0] };
+    }
+    let changed = !resp.ok;
+    const swap = (info) => {
+      const file = info && fileOf(info.trackId);
+      if (!file) return info;
+      changed = true;
+      return uncensoredInfo(info, file);
+    };
+    if (body.downloadInfo) body.downloadInfo = swap(body.downloadInfo);
+    for (const k of ['downloadInfos', 'fileInfos']) if (Array.isArray(body[k])) body[k] = body[k].map(swap);
+    return changed ? jsonResponse(body, resp) : resp;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Данные треков, альбомов и исполнителей в любом ответе API: объекты узнаём по форме,
+  // а не по адресу — они приходят из десятков ручек (альбомы, плейлисты, поиск, волна).
+  // ---------------------------------------------------------------------------
+  const isTrackObj = (o) => typeof o.title === 'string' && Array.isArray(o.artists) && ('durationMs' in o || Array.isArray(o.albums));
+  const isAlbumObj = (o) => typeof o.title === 'string' && ('trackCount' in o || 'volumes' in o || ('year' in o && !('durationMs' in o)));
+  const isArtistObj = (o) => typeof o.name === 'string' && !('title' in o) && ('various' in o || 'composer' in o || 'genres' in o || 'counts' in o);
+  const spoofArtists = (orig, list) =>
+    list.map((a) => {
+      const same = Array.isArray(orig) && orig.find((x) => x && String(x.id) === String(a.id));
+      return same ? { ...same, ...a } : { various: false, composer: false, genres: [], disclaimers: [], available: true, ...a };
+    });
+  // Поля подмены поверх объекта. Служебные поля FckCensor (__fckCensor) и свои (audio,
+  // insert, noAuto, volumes) сюда не попадают.
+  const SKIP_KEYS = new Set(['__fckCensor', 'audio', 'insert', 'noAuto', 'volumes', 'id']);
+  const applySpoof = (o, s) => {
+    let changed = false;
+    for (const [k, v] of Object.entries(s)) {
+      if (SKIP_KEYS.has(k) || v === undefined) continue;
+      if (k === 'artists') {
+        if (!Array.isArray(v) || !v.length) continue;
+        o.artists = spoofArtists(o.artists, v);
+        changed = true;
+      } else if (k === 'coverUri') {
+        if (o.coverUri !== v) changed = true;
+        o.coverUri = v;
+        if ('ogImage' in o) o.ogImage = v;
+        if (o.cover && typeof o.cover === 'object') o.cover = { ...o.cover, uri: v, prefix: undefined };
+        else if (isArtistObj(o)) o.cover = { type: 'from-album-cover', uri: v };
+        // Цвета под обложку Яндекс считает по своей — у подменённой они будут чужими.
+        if (o.derivedColors) delete o.derivedColors;
+      } else if (JSON.stringify(o[k]) !== JSON.stringify(v)) {
+        o[k] = v;
+        changed = true;
+      }
+    }
+    return changed;
+  };
+  // Альбом, в который подмена вернула трек: { id, title, … } для track.albums.
+  const albumSeen = new Map();
+  const albumOfTrack = (trackId) => {
+    const ids = new Set([...Object.keys(own.album), ...(uc ? uc.albums.keys() : [])]);
+    for (const albumId of ids) {
+      const s = spoofOf('album', albumId);
+      const vols = s && Array.isArray(s.volumes) ? s.volumes : null;
+      if (!vols) continue;
+      for (let v = 0; v < vols.length; v++) {
+        const at = (vols[v] || []).findIndex((r) => String(r && typeof r === 'object' ? r.id : r) === trackId);
+        if (at < 0) continue;
+        const seen = albumSeen.get(albumId) || {};
+        return { id: Number(albumId), title: s.title || seen.title || '', coverUri: s.coverUri || seen.coverUri, artists: s.artists || seen.artists || [], year: seen.year, genre: seen.genre, available: true, trackPosition: { volume: v + 1, index: at + 1 } };
+      }
+    }
+    return null;
+  };
+  // Ссылка плеера на трек без альбома (/track?trackId=…) ведёт на страницу, которой в
+  // клиенте нет: страница перезагружается или клик теряется. Ведём в альбом, куда трек
+  // вернула подмена, а если его нет — объясняем.
+  document.addEventListener(
+    'click',
+    (e) => {
+      const a = e.target instanceof Element && e.target.closest('a[href^="/track?"]');
+      const m = a && a.getAttribute('href').match(/trackId=(\d+)/);
+      if (!m || e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const home = albumOfTrack(m[1]);
+      if (home && window.next && window.next.router) window.next.router.push(`/album/track?albumId=${home.id}&trackId=${m[1]}`);
+      else T.toast('Этот трек удалён из Яндекса — своей страницы у него нет');
+    },
+    true
+  );
+  const spoofData = (root) => {
+    let changed = false;
+    const seen = new Set();
+    const walk = (node, depth) => {
+      if (!node || typeof node !== 'object' || depth > 14 || seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) {
+        for (const v of node) walk(v, depth + 1);
+        return;
+      }
+      const id = node.id != null ? String(node.id) : '';
+      if (/^\d+$/.test(id)) {
+        if (isTrackObj(node)) {
+          const s = spoofOf('track', id);
+          if (s && applySpoof(node, s)) changed = true;
+          // Удалённый или закрытый в Яндексе трек, у которого есть файл, снова доступен.
+          if (node.available === false && ucFile(id)) {
+            node.available = true;
+            delete node.error;
+            changed = true;
+          }
+          // У удалённого трека Яндекс не отдаёт альбом, и плеер ведёт на несуществующую
+          // страницу /track. Если трек вернули в альбом — ставим этот альбом.
+          if (Array.isArray(node.albums) && !node.albums.length) {
+            const home = albumOfTrack(id);
+            if (home) {
+              node.albums = [home];
+              changed = true;
+            }
+          }
+        } else if (isAlbumObj(node)) {
+          const s = spoofOf('album', id);
+          if (s && applySpoof(node, s)) changed = true;
+          albumSeen.set(id, { title: node.title, coverUri: node.coverUri, artists: node.artists, year: node.year, genre: node.genre });
+        } else if (isArtistObj(node)) {
+          const s = spoofOf('artist', id);
+          if (s && applySpoof(node, s)) changed = true;
+        }
+      }
+      for (const k in node) {
+        const v = node[k];
+        if (v && typeof v === 'object') walk(v, depth + 1);
+      }
+    };
+    walk(root, 0);
+    return changed;
+  };
+  // Альбом с подменённым списком треков: недостающие (в том числе удалённые Яндексом)
+  // треки дозапрашиваем той же ручкой, что и клиент, — POST /tracks.
+  const restoreVolumes = async (album) => {
+    const s = spoofOf('album', album.id);
+    if (!s || !Array.isArray(s.volumes) || !Array.isArray(album.volumes)) return false;
+    const want = s.volumes.map((v) => (Array.isArray(v) ? v : []).map((r) => String(r && typeof r === 'object' ? r.id : r)).filter((id) => /^\d+$/.test(id)));
+    const count = (volumes) => {
+      const n = volumes.reduce((k, v) => k + v.length, 0);
+      album.trackCount = n;
+      if (album.pager && typeof album.pager === 'object' && 'total' in album.pager) album.pager.total = n;
+    };
+    const flat = album.volumes.flat();
+    // richTracks=false: в ответе только { id } — подставляем свои id, сами треки клиент
+    // дозапросит через POST /tracks, где их данные подменятся как у всех.
+    if (flat.every((t) => t && typeof t === 'object' && typeof t.title !== 'string')) {
+      album.volumes = want.map((v) => v.map((id) => ({ id: Number(id) }))).filter((v) => v.length);
+      count(album.volumes);
+      return album.volumes.length > 0;
+    }
+    const have = new Map();
+    for (const t of flat) {
+      if (!t || typeof t !== 'object' || typeof t.title !== 'string') return false; // ответ смешанный — не трогаем
+      have.set(String(t.id), t);
+    }
+    const missing = [...new Set(want.flat())].filter((id) => !have.has(id));
+    for (const t of await apiTracks(missing)) if (t && t.id != null) have.set(String(t.id), t);
+    const volumes = want.map((v) => v.map((id) => have.get(id)).filter(Boolean)).filter((v) => v.length);
+    if (!volumes.length) return false;
+    album.volumes = volumes;
+    count(volumes);
+    return true;
+  };
+  // Профиль исполнителя: добавленные треки — в начало списков треков, альбомы — в начало
+  // списков альбомов (brief-info, artists/<id>/tracks, …/direct-albums).
+  const insertIntoArtist = async (body, artistId, page0) => {
+    const ins = insertsOf(artistId);
+    if (!ins || (!ins.tracks.length && !ins.albums.length)) return false;
+    let changed = false;
+    const lists = (key, test) => {
+      const out = [];
+      for (const k of key) if (Array.isArray(body[k]) && (!body[k].length || body[k].every((x) => x && typeof x === 'object' && test(x)))) out.push(body[k]);
+      return out;
+    };
+    const trackLists = page0 ? lists(['popularTracks', 'tracks'], isTrackObj) : [];
+    const albumLists = page0 ? lists(['albums', 'directAlbums', 'alsoAlbums'].slice(0, 2), isAlbumObj) : [];
+    if (trackLists.length && ins.tracks.length) {
+      const got = await apiTracks(ins.tracks);
+      for (const list of trackLists) {
+        const add = got.filter((t) => !list.some((x) => String(x.id) === String(t.id)));
+        list.unshift(...add);
+        if (add.length) changed = true;
+      }
+      if (changed && body.pager && typeof body.pager.total === 'number') body.pager.total += ins.tracks.length;
+    }
+    if (albumLists.length && ins.albums.length) {
+      const got = await apiAlbums(ins.albums);
+      for (const list of albumLists) {
+        const add = got.filter((a) => !list.some((x) => String(x.id) === String(a.id)));
+        list.unshift(...add);
+        if (add.length) changed = true;
+      }
+    }
+    return changed;
+  };
+
+  // ---------------------------------------------------------------------------
+  // «Моя волна»: свои загруженные треки и восстановленные «Без цензуры» иногда
+  // встают в очередь волны рядом с её рекомендациями. Пачки волны приходят ответом
+  // rotor/session/new и rotor/session/<id>/tracks — { sequence: [{ type, track, liked, trackParameters }] }.
+  // ---------------------------------------------------------------------------
+  const WAVE_TTL = 30 * 60 * 1000;
+  let waveLocal = { at: 0, list: [], loading: null };
+  const waveUsed = new Set();
+  const waveRecent = []; // исполнители и жанры последних пачек волны
+  const localWaveTracks = () => {
+    if (Date.now() - waveLocal.at < WAVE_TTL) return Promise.resolve(waveLocal.list);
+    if (!waveLocal.loading)
+      waveLocal.loading = (async () => {
+        const uid = await uidOf();
+        const likes = await apiFetch(`users/${uid}/likes/tracks`);
+        const ids = ((likes && likes.library && likes.library.tracks) || []).map((t) => String(t.id)).filter((id) => !/^\d+$/.test(id));
+        const got = ids.length ? await apiTracks(ids) : [];
+        waveLocal = { at: Date.now(), list: got.filter((t) => t && t.available !== false && (t.state == null || t.state === 'playable')), loading: null };
+        return waveLocal.list;
+      })().catch((e) => {
+        console.warn('[tune] свои треки для волны', e);
+        waveLocal = { at: Date.now() - WAVE_TTL + 5 * 60 * 1000, list: waveLocal.list, loading: null };
+        return waveLocal.list;
+      });
+    return waveLocal.loading;
+  };
+  // Восстановленные треки: какие из треков списка в Яндексе недоступны, с исполнителями
+  // и жанром — раз в сутки, в localStorage.
+  const RESTORED_KEY = 'tune:uc-restored';
+  let restored = null;
+  let restoredLoading = null;
+  const restoredTracks = () => {
+    if (!restored)
+      try {
+        restored = JSON.parse(localStorage.getItem(RESTORED_KEY) || 'null');
+      } catch (e) {}
+    const sig = uc ? uc.files.size : 0;
+    if (restored && restored.sig === sig && Date.now() - restored.at < 24 * 3600 * 1000) return Promise.resolve(restored.items);
+    if (!restoredLoading)
+      restoredLoading = apiTracks([...uc.files.keys()])
+        .then((got) => {
+          const items = got
+            .filter((t) => t && t.available === false)
+            .map((t) => ({ id: String(t.id), artists: (t.artists || []).map((a) => String(a.id)), genre: (t.albums && t.albums[0] && t.albums[0].genre) || '' }));
+          restored = { at: Date.now(), sig, items };
+          try {
+            localStorage.setItem(RESTORED_KEY, JSON.stringify(restored));
+          } catch (e) {}
+          return items;
+        })
+        .catch((e) => {
+          console.warn('[tune] восстановленные треки для волны', e);
+          return (restored && restored.items) || [];
+        })
+        .finally(() => (restoredLoading = null));
+    return restoredLoading;
+  };
+  const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
+  const injectWave = async (seq) => {
+    const tracks = seq.map((x) => x && x.track).filter(Boolean);
+    if (!tracks.length) return false;
+    const artists = new Set(tracks.flatMap((t) => (t.artists || []).map((a) => String(a.id))));
+    const genres = new Set(tracks.map((t) => t.albums && t.albums[0] && t.albums[0].genre).filter(Boolean));
+    waveRecent.push({ artists, genres });
+    if (waveRecent.length > 6) waveRecent.shift();
+    const near = (item) => waveRecent.some((r) => item.artists.some((a) => r.artists.has(a)));
+    const sameGenre = (item) => !!item.genre && waveRecent.some((r) => r.genres.has(item.genre));
+    const add = [];
+    if (cfg.localInWave && Math.random() < 0.35) {
+      const pool = (await localWaveTracks()).filter((t) => !waveUsed.has(String(t.id)));
+      if (pool.length) add.push({ track: pickRandom(pool), liked: true });
+    }
+    if (cfg.uncensor && cfg.uncensorWave && uc && uc.files.size) {
+      const pool = (await restoredTracks()).filter((t) => !waveUsed.has(t.id) && ucFile(t.id));
+      const close = pool.filter(near);
+      const genre = pool.filter(sameGenre);
+      const choice = close.length && Math.random() < 0.5 ? pickRandom(close) : genre.length && Math.random() < 0.2 ? pickRandom(genre) : null;
+      if (choice) {
+        const [t] = await apiTracks([choice.id]);
+        if (t) add.push({ track: t, liked: false });
+      }
+    }
+    if (!add.length) return false;
+    const params = (seq.find((x) => x && x.trackParameters) || {}).trackParameters;
+    for (const a of add) {
+      waveUsed.add(String(a.track.id));
+      const at = 1 + Math.floor(Math.random() * Math.max(1, seq.length - 1));
+      seq.splice(at, 0, { type: 'track', track: a.track, liked: a.liked, ...(params ? { trackParameters: { ...params } } : {}) });
+    }
+    return true;
+  };
+
+  // Выключенная автоподмена у трека, который Яндекс удалил, прятала его насовсем — вместе
+  // с меню, где её можно вернуть. Такие отметки снимаем при запуске.
+  let healStarted = false;
+  const healNoAuto = async () => {
+    await loadUncensor();
+    const off = Object.keys(own.track).filter((id) => own.track[id].noAuto && uc && uc.files.has(id));
+    if (!off.length) return;
+    let back = 0;
+    for (const t of await apiTracks(off)) {
+      const id = String(t && t.id);
+      if (!t || t.available !== false || !own.track[id]) continue;
+      delete own.track[id].noAuto;
+      if (!Object.keys(own.track[id]).length) delete own.track[id];
+      back++;
+    }
+    if (!back || !saveOwn()) return;
+    badgesDirty = true;
+    notice({
+      text: back > 1 ? `Удалённые треки снова без цензуры: ${back}` : 'Удалённый трек снова без цензуры',
+      sub: 'Без автоподмены такие треки пропадают из Яндекса, поэтому она снова включена. Трек появится после обновления страницы.',
+      action: 'Обновить',
+      run: () => location.reload(),
+      ms: 15000,
+    });
+  };
+  const API_HOST = /^https:\/\/api\.music\.yandex\.[a-z]+\//;
+  const patchApiData = async (resp, reqUrl) => {
+    const type = resp.headers.get('content-type') || '';
+    if (!type.includes('json')) return resp;
+    const wave = /\/rotor\/session\/(?:new|[^/?#]+\/tracks)(?:[?#]|$)/.test(reqUrl);
+    const uncensorOn = !!cfg.uncensor;
+    if (!uncensorOn && !(wave && cfg.localInWave)) return resp;
+    if (uncensorOn) await Promise.race([loadUncensor(), new Promise((r) => setTimeout(r, 3000))]);
     let body;
     try {
       body = await resp.clone().json();
     } catch (e) {
       return resp;
     }
+    const data = body && typeof body === 'object' && 'result' in body && 'invocationInfo' in body ? body.result : body;
+    if (!data || typeof data !== 'object') return resp;
     let changed = false;
-    const swap = (info) => {
-      const url = info && !('error' in info) && map.get(String(parseInt(info.trackId, 10)));
-      if (!url) return info;
-      changed = true;
-      return uncensoredInfo(info, url);
+    const step = async (what, fn) => {
+      try {
+        if (await fn()) changed = true;
+      } catch (e) {
+        console.warn(`[tune] ${what}`, e);
+      }
     };
-    if (body.downloadInfo) body.downloadInfo = swap(body.downloadInfo);
-    for (const k of ['downloadInfos', 'fileInfos']) if (Array.isArray(body[k])) body[k] = body[k].map(swap);
-    if (!changed) return resp;
-    const headers = new Headers(resp.headers);
-    headers.delete('content-length');
-    headers.delete('content-encoding');
-    return new Response(JSON.stringify(body), { status: resp.status, statusText: resp.statusText, headers });
+    if (wave && Array.isArray(data.sequence)) await step('волна', () => injectWave(data.sequence));
+    if (uncensorOn) {
+      if (/\/albums\/\d+\/with-tracks/.test(reqUrl)) await step('треки альбома', () => restoreVolumes(data));
+      const art = reqUrl.match(/\/artists\/(\d+)\/(brief-info|tracks|direct-albums|safe-direct-albums)(?:[?#]|$)/);
+      if (art) await step('профиль исполнителя', () => insertIntoArtist(data, art[1], !/[?&]page=(?!0(?:&|$))\d+/.test(reqUrl)));
+      if (spoofData(data)) changed = true;
+    }
+    return changed ? jsonResponse(body, resp) : resp;
   };
+
   window.fetch = function (input, init) {
     const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-    const p = origFetch(input, init);
-    if (!/^https:\/\/[^/?#]*\.yandex\.[a-z]+\/(?:[^?#]*\/)?get-file-info(?:\/batch)?\?/.test(url)) return p;
-    return p.then(async (resp) => {
-      if (!resp.ok) return resp;
-      await Promise.race([cfgLoaded, new Promise((r) => setTimeout(r, 4000))]);
-      return cfg.uncensor ? patchFileInfo(resp).catch(() => resp) : resp;
+    const fileInfo = /^https:\/\/[^/?#]*\.yandex\.[a-z]+\/(?:[^?#]*\/)?get-file-info(?:\/batch)?\?/.test(url);
+    const api = !fileInfo && API_HOST.test(url);
+    if (!fileInfo && !api) return origFetch(input, init);
+    // Заголовки запроса (авторизация) — до вызова: тело Request потом уже прочитано.
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    if (init && init.headers) new Headers(init.headers).forEach((v, k) => headers.set(k, v));
+    if (api && headers.has('authorization')) {
+      apiHeaders = headers;
+      apiBase = url.match(API_HOST)[0];
+      const uid = url.match(/\/users\/(\d+)\//);
+      if (uid) myUid = uid[1];
+      if (!healStarted) {
+        healStarted = true;
+        setTimeout(() => healNoAuto().catch((e) => console.warn('[tune] автоподмена удалённых треков', e)), 3000);
+      }
+    }
+    return origFetch(input, init).then(async (resp) => {
+      await Promise.race([cfgLoaded, new Promise((r) => setTimeout(r, fileInfo ? 4000 : 1500))]);
+      if (fileInfo) return cfg.uncensor ? patchFileInfo(resp, url).catch(() => resp) : resp;
+      return resp.ok ? patchApiData(resp, url).catch(() => resp) : resp;
     });
   };
 
@@ -1740,8 +2885,12 @@
     if (!panel) return;
     const host = on ? m : document.body;
     if (panel.parentElement !== host) {
+      // Перенос сбрасывает прокрутку в начало. Возвращаем её сразу: при закрытии текст
+      // уходит с анимацией с того же места, а не прыгает сначала к началу.
+      const body = panel.querySelector('.tune-ly-body');
+      const top = body ? body.scrollTop : 0;
       host.appendChild(panel);
-      // Перенос сбрасывает прокрутку в начало — сразу возвращаем текст к текущей строке.
+      if (body) body.scrollTop = top;
       activeIndex = -2;
       snapScroll = true;
     }
@@ -1810,6 +2959,8 @@
     [...document.querySelectorAll(POPUPS)].filter(
       (e) => !(panel && panel.contains(e)) && !(lyricsFull && e.dataset.testId === 'FULLSCREEN_PLAYER_MODAL') && e.getClientRects().length
     );
+  // Меню «…» полноэкранного плеера открывается поверх текста во весь экран и не убирает его.
+  const keepsFull = (e) => lyricsFull && (e.matches('[role="menu"]') || !!e.querySelector('[role="menu"]'));
   let popupsSeen = new Set();
   let domCheck = 0;
   // Текст Яндекса в полноэкранном плеере или его окно с текстом играющего трека —
@@ -1868,14 +3019,14 @@
         }
       }
       const now = openPopups();
-      if (now.some((e) => !popupsSeen.has(e))) toggleLyrics(false);
+      if (now.some((e) => !popupsSeen.has(e) && !keepsFull(e))) toggleLyrics(false);
       popupsSeen = new Set(now);
     });
   });
   window.addEventListener(
     'keydown',
     (e) => {
-      if (!lyricsOpen || e.key !== 'Escape' || typing(e.target) || openPopups().some((p) => !popupsSeen.has(p))) return;
+      if (!lyricsOpen || e.key !== 'Escape' || typing(e.target) || openPopups().some((p) => !popupsSeen.has(p) || keepsFull(p))) return;
       e.preventDefault();
       e.stopPropagation();
       if (lyricsFull) leaveFull();

@@ -11,6 +11,8 @@ fn main() {
             "page_download",
             "page_reveal_download",
             "page_lyrics",
+            "page_spoof_save",
+            "page_spoof_remove",
             "install_update",
             "skip_update",
             // страница первой загрузки интерфейса

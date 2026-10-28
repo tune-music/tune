@@ -9,6 +9,7 @@
 //! зашит в темах PulseSync и Next Music). Настоящий порт не открывается: запросы
 //! к нему тоже перехватываются, поэтому Tune не конфликтует с запущенными модами.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::asar::{Asar, Served};
@@ -22,6 +23,8 @@ pub struct Hooks {
     pub head_script: Box<dyn Fn() -> String + Send + Sync>,
     /// Ответ сервера ассетов: (путь, строка запроса).
     pub addon_server: Box<dyn Fn(&str, &str) -> Served + Send + Sync>,
+    /// Папка данных Tune: файлы ручной подмены (spoof.rs).
+    pub data_root: PathBuf,
 }
 
 /// Правки кода интерфейса: флаги-эксперименты читаются через window.__tuneExp, чтобы
@@ -136,10 +139,21 @@ pub fn install(win: &tauri::WebviewWindow, asar: Arc<Asar>, hooks: Hooks) -> tau
                     args.Request()?.Uri(&mut uri)?;
                     take_pwstr(uri)
                 };
+                let mut content_range = None;
                 let (served, cors) = if let Some(rest) = uri.strip_prefix(ORIGIN) {
                     let path = rest.split(['?', '#']).next().unwrap_or("/");
                     let path = if path.is_empty() { "/" } else { path };
-                    (serve_page(&asar, &hooks, path), false)
+                    if let Some(name) = path.strip_prefix(crate::spoof::PREFIX) {
+                        let range = {
+                            let mut v = PWSTR::null();
+                            args.Request()?.Headers()?.GetHeader(&HSTRING::from("Range"), &mut v).ok().map(|_| take_pwstr(v))
+                        };
+                        let (served, cr) = crate::spoof::serve(&hooks.data_root, name, range.as_deref());
+                        content_range = cr;
+                        (served, false)
+                    } else {
+                        (serve_page(&asar, &hooks, path), false)
+                    }
                 } else if let Some(rest) = ADDON_HOSTS.iter().find_map(|h| uri.strip_prefix(h)) {
                     let rest = rest.split('#').next().unwrap_or("");
                     let (path, query) = rest.split_once('?').unwrap_or((rest, ""));
@@ -154,8 +168,15 @@ pub fn install(win: &tauri::WebviewWindow, asar: Arc<Asar>, hooks: Hooks) -> tau
                 if cors {
                     let _ = writeln!(headers, "Access-Control-Allow-Origin: *");
                 }
+                if served.mime.starts_with("audio/") {
+                    let _ = writeln!(headers, "Accept-Ranges: bytes");
+                }
+                if let Some(cr) = &content_range {
+                    let _ = writeln!(headers, "Content-Range: {cr}");
+                }
                 let status = HSTRING::from(match served.status {
                     200 => "OK",
+                    206 => "Partial Content",
                     400 => "Bad Request",
                     _ => "Not Found",
                 });

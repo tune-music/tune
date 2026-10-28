@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tune Music</title>
-  <meta name="description" content="Клиент Яндекс Музыки для Windows с темами, плагинами, текстами песен, скачиванием треков и статусом в Discord." />
+  <meta name="description" content="Клиент Яндекс Музыки для Windows: темы и аддоны, синхронный текст, треки без цензуры, скачивание, найткор и статус в Discord." />
   <meta property="og:title" content="Tune Music" />
-  <meta property="og:description" content="Клиент Яндекс Музыки для Windows с темами, плагинами и улучшениями." />
+  <meta property="og:description" content="Клиент Яндекс Музыки для Windows с темами, аддонами и всем, чего не хватало." />
   <meta property="og:image" content="https://tune-music.github.io/tune/assets/og.png" />
   <meta name="theme-color" content="#09090b" />
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
@@ -31,73 +31,247 @@
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
-      margin: 0; background: var(--bg); color: var(--text);
+      margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden;
       font: 16px/1.6 Manrope, "Segoe UI", system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     a { color: inherit; }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+    img { display: block; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
 
-    header.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    header.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
     header.top .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; text-decoration: none; font-size: 17px; }
     .brand img { width: 28px; height: 28px; }
-    nav { display: flex; gap: 20px; margin-left: auto; font-size: 14px; }
-    nav a { color: var(--text-2); text-decoration: none; }
+    nav { display: flex; gap: 22px; margin-left: auto; font-size: 14px; align-items: center; }
+    nav a { color: var(--text-2); text-decoration: none; transition: color .15s; }
     nav a:hover { color: var(--text); }
+    nav .nav-dl { color: var(--on-accent); background: var(--accent); padding: 7px 14px; border-radius: 8px; font-weight: 700; }
+    nav .nav-dl:hover { color: var(--on-accent); background: var(--accent-hover); }
 
-    .hero { padding: 88px 0 72px; position: relative; overflow: hidden; }
-    .hero::before {
-      content: ""; position: absolute; inset: -40% -10% auto auto; width: 720px; height: 720px; border-radius: 50%;
-      background: radial-gradient(closest-side, rgba(250, 204, 21, .16), transparent); pointer-events: none;
+    /* ---------- Окно приложения в миниатюре: интерфейс поверх арта темы ---------- */
+    .app {
+      --art: none; --glass: rgba(8, 10, 16, .34); --line: rgba(255,255,255,.55); --dim: rgba(255,255,255,.22); --hi: #fff;
+      position: relative; aspect-ratio: 16 / 10; border-radius: 14px; overflow: hidden; isolation: isolate;
+      background: #0b0b0e var(--art) center / cover no-repeat;
+      box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08) inset;
+      display: grid; grid-template-columns: 22% 1fr; grid-template-rows: 1fr 15%; gap: 3.2%; padding: 3.2%;
+      font-size: 10px;
     }
-    .hero .wrap { display: grid; grid-template-columns: 1.15fr .85fr; gap: 48px; align-items: center; position: relative; }
-    .eyebrow { display: inline-flex; gap: 8px; align-items: center; padding: 4px 12px; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-2); font-size: 13px; }
+    .app::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.3)); }
+    .app > div { border-radius: 8px; background: var(--glass); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); border: 1px solid rgba(255,255,255,.14); }
+    .app > .app-main { background: linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.28)); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: rgba(255,255,255,.06); }
+    .app-side { padding: 9% 10%; display: flex; flex-direction: column; gap: 9%; }
+    .app-side i { display: block; height: 5%; min-height: 4px; border-radius: 3px; background: var(--dim); }
+    .app-side i:first-child { width: 70%; background: var(--line); height: 7%; margin-bottom: 8%; }
+    .app-side i:nth-child(3) { background: var(--line); }
+    .app-side i:nth-child(2n) { width: 82%; }
+    .app-main { padding: 4.5%; display: flex; flex-direction: column; gap: 5%; }
+    .app-head { display: flex; gap: 5%; align-items: flex-end; }
+    .app-cover { width: 26%; aspect-ratio: 1; border-radius: 6px; background: var(--art) center / cover; box-shadow: 0 6px 16px rgba(0,0,0,.4); flex: none; }
+    .app-titles { flex: 1; display: flex; flex-direction: column; gap: 10%; padding-bottom: 2%; }
+    .app-titles b { display: block; height: 11px; width: 78%; border-radius: 3px; background: var(--hi); opacity: .9; }
+    .app-titles i { display: block; height: 6px; width: 42%; border-radius: 3px; background: var(--line); }
+    .app-rows { display: flex; flex-direction: column; gap: 7%; flex: 1; justify-content: space-evenly; }
+    .app-rows i { display: flex; gap: 6%; align-items: center; height: 5px; }
+    .app-rows i::before { content: ""; height: 100%; width: 48%; border-radius: 3px; background: var(--line); }
+    .app-rows i::after { content: ""; height: 100%; width: 10%; margin-left: auto; border-radius: 3px; background: var(--dim); }
+    .app-rows i:nth-child(2)::before { width: 36%; }
+    .app-rows i:nth-child(3)::before { width: 56%; }
+    .app-bar { grid-column: 1 / 3; display: flex; align-items: center; gap: 2.4%; padding: 0 2.4%; }
+    .app-bar .c { height: 64%; aspect-ratio: 1; border-radius: 4px; background: var(--art) center / cover; }
+    .app-bar .t { display: flex; flex-direction: column; gap: 5px; width: 18%; }
+    .app-bar .t b { height: 5px; border-radius: 3px; background: var(--hi); opacity: .85; }
+    .app-bar .t i { height: 4px; width: 60%; border-radius: 3px; background: var(--dim); }
+    .app-bar .p { margin-left: 13%; width: 7%; aspect-ratio: 1; border-radius: 50%; background: var(--hi); box-shadow: 0 0 0 4px rgba(255,255,255,.08); }
+    .app-bar .s { flex: 1; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--hi) 38%, var(--dim) 38%); margin: 0 3%; }
+
+    /* ---------- Первый экран ---------- */
+    .hero { padding: 72px 0 96px; position: relative; overflow: hidden; }
+    .hero::before {
+      content: ""; position: absolute; inset: -30% -20% auto auto; width: 900px; height: 900px; border-radius: 50%;
+      background: radial-gradient(closest-side, rgba(250, 204, 21, .14), transparent); pointer-events: none;
+    }
+    .hero::after {
+      content: ""; position: absolute; inset: auto auto -40% -20%; width: 800px; height: 800px; border-radius: 50%;
+      background: radial-gradient(closest-side, rgba(56, 189, 248, .10), transparent); pointer-events: none;
+    }
+    .hero .wrap { display: grid; grid-template-columns: 1fr 1.05fr; gap: 40px; align-items: center; position: relative; z-index: 1; }
+    .eyebrow { display: inline-flex; gap: 8px; align-items: center; padding: 4px 12px; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-2); font-size: 13px; background: rgba(255,255,255,.02); }
     .eyebrow b { color: var(--accent); font-weight: 700; }
-    h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.05; letter-spacing: -.02em; margin: 20px 0 18px; font-weight: 800; }
-    h1 em { font-style: normal; color: var(--accent); }
-    .lead { font-size: 19px; color: var(--text-2); max-width: 560px; margin: 0 0 32px; }
+    h1 { font-size: clamp(38px, 6vw, 64px); line-height: 1.03; letter-spacing: -.025em; margin: 20px 0 18px; font-weight: 800; }
+    h1 em { font-style: normal; background: linear-gradient(100deg, #fde047, #facc15 40%, #fb923c); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lead { font-size: 19px; color: var(--text-2); max-width: 540px; margin: 0 0 32px; }
     .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
     .btn {
-      display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 22px; border-radius: 10px;
+      display: inline-flex; align-items: center; gap: 10px; height: 50px; padding: 0 22px; border-radius: 12px;
       font: 700 15px/1 Manrope, system-ui, sans-serif; text-decoration: none; border: 1px solid var(--border-strong);
-      background: var(--panel-2); color: var(--text); transition: background .15s, transform .15s;
+      background: var(--panel-2); color: var(--text); transition: background .15s, transform .15s, box-shadow .15s;
     }
     .btn:hover { background: #222226; }
     .btn:active { transform: translateY(1px); }
-    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: 0 10px 30px rgba(250, 204, 21, .22); }
+    .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 12px 36px rgba(250, 204, 21, .32); }
     .btn svg { width: 18px; height: 18px; flex: none; }
     .meta { margin-top: 16px; color: var(--text-3); font-size: 14px; }
 
-    .mock { border: 1px solid var(--border); border-radius: 18px; background: var(--panel); padding: 18px; box-shadow: 0 40px 80px rgba(0,0,0,.45); }
-    .mock-bar { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; background: var(--panel-2); }
-    .mock-cover { width: 52px; height: 52px; border-radius: 8px; background: linear-gradient(135deg, #f472b6, #7c3aed 55%, #0ea5e9); flex: none; }
-    .mock-title { font-weight: 700; }
-    .mock-sub { color: var(--text-3); font-size: 13px; }
-    .mock-lock { color: var(--accent); width: 15px; height: 15px; vertical-align: -2px; margin-left: 4px; }
-    .mock-lines { padding: 22px 8px 6px; text-align: center; font-weight: 800; font-size: 20px; line-height: 1.5; }
-    .mock-lines p { margin: 0; opacity: .25; }
-    .mock-lines p.now { opacity: 1; font-size: 23px; }
-    .mock-toast { margin: 16px auto 0; width: fit-content; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; background: #18181bf2; border: 1px solid var(--border); font-size: 13px; }
-    .mock-toast i { display: block; width: 160px; height: 4px; border-radius: 2px; background: #ffffff24; overflow: hidden; }
-    .mock-toast i::after { content: ""; display: block; width: 64%; height: 100%; background: var(--accent); }
+    .fan { position: relative; height: 460px; perspective: 1400px; }
+    .fan .app { position: absolute; width: 84%; top: 50%; left: 50%; transition: transform .6s cubic-bezier(.2,.8,.2,1), filter .6s; }
+    .fan .app:nth-child(1) { transform: translate(-74%, -64%) rotate(-10deg) scale(.82); filter: brightness(.8); }
+    .fan .app:nth-child(2) { transform: translate(-26%, -34%) rotate(8deg) scale(.82); filter: brightness(.8); }
+    .fan .app:nth-child(3) { transform: translate(-50%, -50%) rotate(-1.5deg); z-index: 2; }
+    .fan:hover .app:nth-child(1) { transform: translate(-86%, -68%) rotate(-14deg) scale(.82); filter: brightness(.95); }
+    .fan:hover .app:nth-child(2) { transform: translate(-14%, -30%) rotate(12deg) scale(.82); filter: brightness(.95); }
+    .fan:hover .app:nth-child(3) { transform: translate(-50%, -52%) rotate(0deg) scale(1.02); }
+    .fan .badge-float {
+      position: absolute; z-index: 3; display: flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 12px;
+      background: rgba(24,24,27,.94); border: 1px solid var(--border-strong); box-shadow: 0 16px 40px rgba(0,0,0,.5); font-size: 13px; font-weight: 700;
+      animation: float 6s ease-in-out infinite;
+    }
+    .fan .badge-float svg { width: 16px; height: 16px; color: var(--accent); }
+    .fan .bf1 { left: 2%; bottom: 8%; }
+    .fan .bf2 { right: 0; top: 6%; animation-delay: -3s; }
+    @keyframes float { 50% { transform: translateY(-8px); } }
 
-    section { padding: 72px 0; border-top: 1px solid var(--border); }
-    h2 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -.015em; margin: 0 0 10px; font-weight: 800; }
-    .section-lead { color: var(--text-2); margin: 0 0 36px; max-width: 640px; }
+    /* ---------- Секции ---------- */
+    section { padding: 96px 0; border-top: 1px solid var(--border); position: relative; }
+    .kicker { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 10px; }
+    h2 { font-size: clamp(30px, 4.4vw, 44px); line-height: 1.1; letter-spacing: -.02em; margin: 0 0 14px; font-weight: 800; }
+    .section-lead { color: var(--text-2); margin: 0 0 44px; max-width: 640px; font-size: 17px; }
+
+    /* Колода тем: карточки друг за другом под углом */
+    .deck-wrap { overflow: hidden; margin: 0 calc(50% - 50vw); padding: 40px 0 50px; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+    .deck { display: flex; justify-content: center; perspective: 1600px; }
+    .deck figure { margin: 0 0 0 -6%; width: min(360px, 30vw); flex: none; transform: rotateY(24deg) rotateZ(-2deg) translateZ(0); transform-origin: left center; transition: transform .5s cubic-bezier(.2,.8,.2,1), margin .5s cubic-bezier(.2,.8,.2,1); cursor: default; }
+    .deck figure:first-child { margin-left: 0; }
+    .deck figure:nth-child(2n) { transform: rotateY(24deg) rotateZ(1.5deg) translateY(14px); }
+    .deck figure:hover { transform: rotateY(0) rotateZ(0) translateY(-18px) scale(1.1); z-index: 5; margin-right: 7%; }
+    .deck figure .app { font-size: 9px; }
+    .deck figcaption { margin-top: 14px; font-weight: 700; font-size: 14px; display: flex; gap: 8px; align-items: center; opacity: 0; transform: translateY(-6px); transition: opacity .3s, transform .3s; white-space: nowrap; }
+    .deck figure:hover figcaption { opacity: 1; transform: none; }
+    .deck figcaption span { color: var(--text-3); font-weight: 600; font-size: 12px; }
+    .deck-note { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px; }
+    .chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text-2); font-size: 14px; }
+    .chip b { color: var(--text); }
+
+    /* Возможности: ряд «текст + иллюстрация» */
+    .feature { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; margin-bottom: 96px; }
+    .feature:last-child { margin-bottom: 0; }
+    .feature.flip .f-text { order: 2; }
+    .f-text h3 { font-size: clamp(24px, 3vw, 32px); line-height: 1.15; letter-spacing: -.015em; margin: 0 0 14px; }
+    .f-text p { color: var(--text-2); margin: 0 0 14px; font-size: 16px; }
+    .f-text ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+    .f-text li { display: flex; gap: 10px; color: var(--text-2); font-size: 15px; }
+    .f-text li::before { content: ""; flex: none; width: 18px; height: 18px; margin-top: 3px; border-radius: 50%; background: rgba(250,204,21,.14) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23facc15' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4.5 8.2 2.3 2.3 4.7-4.9'/%3E%3C/svg%3E") center / 14px no-repeat; }
+    .f-text .new { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 2px 8px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+
+    .stage {
+      position: relative; border-radius: 22px; border: 1px solid var(--border); padding: 34px; min-height: 340px; overflow: hidden; isolation: isolate;
+      background: radial-gradient(120% 90% at 85% 0%, var(--glow, rgba(250,204,21,.16)), transparent 60%), linear-gradient(180deg, #141417, #0d0d10);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .stage::after { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px); background-size: 22px 22px; mask-image: linear-gradient(180deg, #000, transparent 85%); }
+    .ui { background: rgba(24,24,27,.96); border: 1px solid var(--border-strong); border-radius: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.5); }
+
+    /* Иллюстрация: текст песни */
+    .ly { width: 100%; max-width: 420px; padding: 22px 26px; text-align: center; font-weight: 800; }
+    .ly-head { display: flex; gap: 12px; align-items: center; text-align: left; margin-bottom: 18px; }
+    .ly-head .cv { width: 44px; height: 44px; border-radius: 8px; background: url(assets/themes/kokou-no-sousei.webp) center / cover; flex: none; }
+    .ly-head b { display: block; font-size: 15px; }
+    .ly-head small { color: var(--text-3); font-weight: 600; font-size: 13px; }
+    .ly p { margin: 0 0 10px; font-size: 19px; line-height: 1.3; opacity: .22; transition: all .5s; }
+    .ly p.now { opacity: 1; transform: scale(1.06); }
+    .ly p.next { opacity: .5; }
+    .ly-foot { display: flex; justify-content: space-between; margin-top: 16px; color: var(--text-3); font-size: 12px; font-weight: 600; }
+
+    /* Иллюстрация: без цензуры */
+    .uc { width: 100%; max-width: 460px; display: grid; gap: 14px; }
+    .uc-rows { padding: 8px; }
+    .uc-row { display: grid; grid-template-columns: 22px 36px 1fr auto; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 10px; font-size: 14px; }
+    .uc-row + .uc-row { border-top: 1px solid rgba(255,255,255,.04); }
+    .uc-row .n { color: var(--text-3); font-weight: 700; text-align: center; }
+    .uc-row .cv { width: 36px; height: 36px; border-radius: 6px; background: var(--c) center / cover; }
+    .uc-row .t b { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+    .uc-row .t small { color: var(--text-3); font-size: 12px; font-weight: 600; }
+    .uc-row .d { color: var(--text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+    .uc-row s { color: var(--text-3); text-decoration-color: #f87171; }
+    .uc-row .lock { width: 14px; height: 14px; color: var(--accent); }
+    .uc-row.back { background: rgba(250,204,21,.07); }
+    .uc-row .tag { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; background: rgba(74,222,128,.14); color: #4ade80; }
+    .uc-edit { padding: 16px 18px; font-size: 13px; margin-left: 40px; }
+    .uc-edit h4 { margin: 0 0 12px; font-size: 15px; }
+    .uc-field { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+    .uc-field label { width: 100%; color: var(--text-3); font-size: 11px; font-weight: 700; }
+    .uc-input { flex: 1; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: rgba(255,255,255,.04); }
+    .uc-pill { padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,.08); font-weight: 600; font-size: 12px; }
+    .uc-pill.y { background: var(--accent); color: var(--on-accent); }
+
+    /* Иллюстрация: «Моя волна» */
+    .wave { position: relative; width: 340px; height: 300px; }
+    .wave .orb { position: absolute; inset: 50px 70px; border-radius: 50%; background: conic-gradient(from 0deg, #f472b6, #a78bfa, #38bdf8, #34d399, #facc15, #f472b6); filter: blur(22px); opacity: .75; animation: spin 14s linear infinite; }
+    .wave .core { position: absolute; inset: 92px 112px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #e4e4e7 30%, #a1a1aa); box-shadow: 0 0 60px rgba(255,255,255,.25); display: grid; place-items: center; color: #18181b; font-weight: 800; font-size: 13px; text-align: center; line-height: 1.2; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .wave .pill { position: absolute; display: flex; gap: 8px; align-items: center; padding: 7px 11px 7px 7px; border-radius: 12px; font-size: 12px; font-weight: 700; white-space: nowrap; animation: float 7s ease-in-out infinite; }
+    .wave .pill i { width: 26px; height: 26px; border-radius: 6px; background: var(--c) center / cover; flex: none; }
+    .wave .pill small { display: block; color: var(--text-3); font-weight: 600; font-size: 11px; }
+    .wave .pill.mine { border-color: rgba(250,204,21,.55); }
+    .wave .pill.mine small { color: var(--accent); }
+    .wave .pill.back small { color: #4ade80; }
+
+    /* Иллюстрация: скорость и эффекты */
+    .fx { width: 100%; max-width: 440px; padding: 22px; display: grid; gap: 18px; }
+    .bars { display: flex; align-items: center; gap: 4px; height: 90px; }
+    .bars i { flex: 1; border-radius: 3px; background: linear-gradient(180deg, #fde047, #f97316); animation: eq 1.1s ease-in-out infinite alternate; transform-origin: center; }
+    @keyframes eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
+    .fx-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 600; }
+    .fx-row small { color: var(--text-3); font-weight: 600; display: block; font-size: 12px; }
+    .speed { display: flex; gap: 6px; }
+    .speed span { padding: 6px 11px; border-radius: 999px; background: rgba(255,255,255,.07); font-weight: 800; font-size: 13px; color: var(--text-2); }
+    .speed span.on { background: var(--accent); color: var(--on-accent); }
+    .sw { width: 38px; height: 22px; border-radius: 999px; background: var(--accent); position: relative; flex: none; }
+    .sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: #18181b; }
+    .range { width: 140px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) 35%, rgba(255,255,255,.12) 35%); position: relative; }
+    .range::after { content: ""; position: absolute; left: 35%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; }
+
+    /* Иллюстрация: скачивание и Discord */
+    .dd { width: 100%; max-width: 420px; display: grid; gap: 16px; }
+    .toast { display: grid; grid-template-columns: 38px 1fr auto; gap: 6px 12px; align-items: center; padding: 12px 14px; font-size: 13px; font-weight: 600; }
+    .toast .cv { grid-row: 1 / 3; width: 38px; height: 38px; border-radius: 6px; background: url(assets/themes/aquarium.webp) center / cover; }
+    .toast .pc { color: var(--text-3); font-variant-numeric: tabular-nums; }
+    .toast .bar { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
+    .toast .bar i { display: block; height: 100%; width: 64%; background: var(--accent); border-radius: inherit; animation: load 3.2s ease-in-out infinite; }
+    @keyframes load { from { width: 8%; } to { width: 96%; } }
+    .discord { padding: 16px; background: #232428; border-color: #2e3035; }
+    .discord .lbl { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #b5bac1; margin-bottom: 10px; }
+    .discord .body { display: flex; gap: 12px; }
+    .discord .cv { width: 64px; height: 64px; border-radius: 8px; background: url(assets/themes/night-of-knights.webp) center / cover; flex: none; position: relative; }
+    .discord .cv::after { content: ""; position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; border: 3px solid #232428; background: #facc15 url(assets/icon.svg) center / 70% no-repeat; }
+    .discord b { display: block; font-size: 14px; }
+    .discord span { display: block; font-size: 13px; color: #dbdee1; }
+    .discord .time { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 11px; color: #b5bac1; }
+    .discord .time i { flex: 1; height: 4px; border-radius: 2px; background: linear-gradient(90deg, #fff 42%, #4e5058 42%); }
+    .discord .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .discord .btns span { text-align: center; padding: 7px; border-radius: 4px; background: #4e5058; font-size: 13px; color: #fff; font-weight: 600; }
+
+    /* Мелкие возможности */
     .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-    .card { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); padding: 22px; }
+    .card { border: 1px solid var(--border); border-radius: 16px; background: var(--panel); padding: 22px; transition: border-color .2s, transform .2s; }
+    .card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
     .card .ico { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: rgba(250, 204, 21, .1); color: var(--accent); margin-bottom: 14px; }
     .card .ico svg { width: 22px; height: 22px; }
     .card h3 { margin: 0 0 6px; font-size: 17px; }
     .card p { margin: 0; color: var(--text-2); font-size: 15px; }
 
     .steps { counter-reset: s; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-    .step { counter-increment: s; border: 1px solid var(--border); border-radius: 14px; padding: 22px; background: var(--panel); }
-    .step::before { content: counter(s); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 800; margin-bottom: 12px; }
+    .step { counter-increment: s; border: 1px solid var(--border); border-radius: 16px; padding: 24px; background: var(--panel); }
+    .step::before { content: counter(s); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 800; margin-bottom: 14px; }
     .step h3 { margin: 0 0 6px; font-size: 17px; }
     .step p { margin: 0; color: var(--text-2); font-size: 15px; }
+
+    .final { text-align: center; padding: 110px 0; overflow: hidden; }
+    .final::before { content: ""; position: absolute; left: 50%; top: 50%; width: 900px; height: 500px; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(250,204,21,.12), transparent); pointer-events: none; }
+    .final .cta { justify-content: center; }
+    .final .section-lead { margin: 0 auto 32px; }
 
     details { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 0 20px; margin-bottom: 10px; }
     summary { cursor: pointer; padding: 16px 0; font-weight: 700; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
@@ -105,18 +279,35 @@
     summary::after { content: "+"; color: var(--text-3); font-weight: 600; }
     details[open] summary::after { content: "−"; }
     details p { margin: 0 0 16px; color: var(--text-2); }
+    code { font-size: 14px; background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
 
     footer { border-top: 1px solid var(--border); padding: 32px 0 48px; color: var(--text-3); font-size: 14px; }
     footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; }
 
-    @media (max-width: 860px) {
-      .hero { padding: 56px 0 48px; }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
+    .reveal.in { opacity: 1; transform: none; }
+
+    @media (max-width: 920px) {
+      .hero { padding: 48px 0 56px; }
       .hero .wrap { grid-template-columns: 1fr; }
+      .fan { height: 320px; }
+      .feature, .feature.flip { grid-template-columns: 1fr; gap: 28px; margin-bottom: 72px; }
+      .feature.flip .f-text { order: 0; }
       .grid, .steps { grid-template-columns: 1fr; }
-      nav { display: none; }
+      nav a:not(.nav-dl) { display: none; }
+      section { padding: 72px 0; }
+      .deck { justify-content: flex-start; overflow-x: auto; scroll-snap-type: x mandatory; padding: 20px 20px 30px; perspective: none; }
+      .deck figure, .deck figure:nth-child(2n) { width: 72%; margin: 0 14px 0 0; transform: none; scroll-snap-align: center; }
+      .deck figure:hover { transform: none; margin-right: 14px; }
+      .deck figcaption { opacity: 1; transform: none; }
+      .stage { padding: 22px 16px; min-height: 0; }
+      .uc-edit { margin-left: 0; }
+      .wave { transform: scale(.9); }
     }
-    @media (min-width: 861px) and (max-width: 1000px) {
-      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (min-width: 921px) and (max-width: 1060px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
     }
   </style>
 </head>
@@ -125,10 +316,12 @@
     <div class="wrap">
       <a class="brand" href="#"><img src="assets/icon.svg" alt="" />Tune Music</a>
       <nav>
+        <a href="#themes">Темы</a>
         <a href="#features">Возможности</a>
         <a href="#install">Установка</a>
         <a href="#faq">Вопросы</a>
         <a href="https://github.com/tune-music/tune">GitHub</a>
+        <a class="nav-dl" href="#download">Скачать</a>
       </nav>
     </div>
   </header>
@@ -138,84 +331,206 @@
       <div class="wrap">
         <div>
           <span class="eyebrow"><b>Windows 10 и 11</b> · бесплатно · открытый код</span>
-          <h1>Яндекс Музыка <em>с темами, плагинами</em> и всем, чего не хватало</h1>
-          <p class="lead">Tune — отдельное приложение для Яндекс Музыки: аддоны PulseSync и Next Music, синхронный текст, скачивание треков, версии без цензуры и статус в Discord. Официальный клиент ставить не нужно.</p>
-          <div class="cta">
-            <a class="btn btn-primary" id="dl-setup" href="https://github.com/tune-music/tune/releases/latest">
+          <h1>Яндекс Музыка, <em>какой она должна быть</em></h1>
+          <p class="lead">Tune — отдельное приложение для Яндекс Музыки: темы и аддоны, синхронный текст, треки без цензуры, найткор, скачивание и статус в Discord. Официальный клиент ставить не нужно.</p>
+          <div class="cta" id="download">
+            <a class="btn btn-primary dl-setup" href="https://github.com/tune-music/tune/releases/latest">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
               Скачать для Windows
             </a>
-            <a class="btn" id="dl-portable" href="https://github.com/tune-music/tune/releases/latest">Переносная версия</a>
+            <a class="btn dl-portable" href="https://github.com/tune-music/tune/releases/latest">Переносная версия</a>
           </div>
-          <p class="meta" id="dl-meta">Последний выпуск — на GitHub.</p>
+          <p class="meta dl-meta">Последний выпуск — на GitHub.</p>
         </div>
-        <div class="mock" aria-hidden="true">
-          <div class="mock-bar">
-            <div class="mock-cover"></div>
-            <div>
-              <div class="mock-title">Название трека<svg class="mock-lock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.25" width="10" height="6.75" rx="1.75"/><path d="M5.5 7.25V5.1a2.5 2.5 0 0 1 4.85-.85"/><path d="M8 10v1.25"/></svg></div>
-              <div class="mock-sub">Исполнитель</div>
-            </div>
-          </div>
-          <div class="mock-lines">
-            <p>строка, что уже прошла</p>
-            <p class="now">та, что звучит сейчас</p>
-            <p>и следующая за ней</p>
-          </div>
-          <div class="mock-toast"><span>Скачивание · 64 %</span><i></i></div>
+        <div class="fan" aria-hidden="true">
+          <div class="app" style="--art: url(assets/themes/cyber-glitch.webp)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div>
+          <div class="app" style="--art: url(assets/themes/frutiger-aero.webp)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div>
+          <div class="app" style="--art: url(assets/themes/aquarium.webp)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div>
+          <div class="badge-float bf1"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.25" width="10" height="6.75" rx="1.75"/><path d="M5.5 7.25V5.1a2.5 2.5 0 0 1 4.85-.85"/><path d="M8 10v1.25"/></svg>Без цензуры</div>
+          <div class="badge-float bf2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg>Синхронный текст</div>
         </div>
       </div>
     </div>
 
+    <section id="themes">
+      <div class="wrap">
+        <p class="kicker">Темы</p>
+        <h2>Своя Яндекс Музыка за один клик</h2>
+        <p class="section-lead">Каталог тем и аддонов прямо в окне Tune: наведите на карточку, чтобы рассмотреть. Подходят темы PulseSync и Next Music — из каталога, из файла или по ссылке на GitHub.</p>
+        <div class="deck-wrap">
+          <div class="deck">
+            <figure><div class="app" style="--art: url(assets/themes/aquarium.webp)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div><figcaption>Aquarium <span>tune-music</span></figcaption></figure>
+            <figure><div class="app" style="--art: url(assets/themes/cyber-glitch.webp)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div><figcaption>CYBER GLITCH <span>tune-music</span></figcaption></figure>
+            <figure><div class="app" style="--art: url(assets/themes/everything-will-freeze.webp); --glass: rgba(0,0,0,.55)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div><figcaption>EVERYTHING WILL FREEZE <span>tune-music</span></figcaption></figure>
+            <figure><div class="app" style="--art: url(assets/themes/frutiger-aero.webp); --glass: rgba(255,255,255,.22)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div><figcaption>Frutiger Aero <span>tune-music</span></figcaption></figure>
+            <figure><div class="app" style="--art: url(assets/themes/kokou-no-sousei.webp)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div><figcaption>Kokou no Sousei <span>tune-music</span></figcaption></figure>
+            <figure><div class="app" style="--art: url(assets/themes/night-of-knights.webp)"><div class="app-side"><i></i><i></i><i></i><i></i><i></i></div><div class="app-main"><div class="app-head"><div class="app-cover"></div><div class="app-titles"><b></b><i></i></div></div><div class="app-rows"><i></i><i></i><i></i><i></i></div></div><div class="app-bar"><div class="c"></div><div class="t"><b></b><i></i></div><div class="p"></div><div class="s"></div></div></div><figcaption>Night of Knights <span>tune-music</span></figcaption></figure>
+          </div>
+        </div>
+        <div class="deck-note">
+          <span class="chip"><b>Каталог</b> Next Music Extensions и авторов</span>
+          <span class="chip"><b>.zip · .pext · .css · .js</b> из файла</span>
+          <span class="chip"><b>GitHub</b> по ссылке на репозиторий</span>
+          <span class="chip"><b>Свой аддон</b> прямо в окне Tune</span>
+        </div>
+      </div>
+    </section>
+
     <section id="features">
       <div class="wrap">
-        <h2>Возможности</h2>
-        <p class="section-lead">Всё включается и выключается в настройках Tune: кнопка «Tune» в боковой панели музыки или меню значка в трее.</p>
-        <div class="grid">
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
-            <h3>Темы и аддоны</h3>
-            <p>Подходят аддоны PulseSync и Next Music: из каталога, из файла (.zip, .pext, .css, .js) или по ссылке на GitHub.</p>
+        <p class="kicker">Возможности</p>
+        <h2>Всё, чего не хватало</h2>
+        <p class="section-lead">Каждая функция включается и выключается в настройках Tune — кнопка «Tune» в боковой панели музыки или меню значка в трее.</p>
+
+        <div class="feature reveal">
+          <div class="f-text">
+            <h3>Синхронный текст для любого трека</h3>
+            <p>Если у Яндекса текста нет, Tune находит его в LRCLIB и NetEase. Строки подсвечиваются по ходу песни, клик по строке перематывает.</p>
+            <ul>
+              <li>Окно сбоку или во весь экран, как в полноэкранном плеере Яндекса</li>
+              <li>«Текст песни» в меню «…» у каждого трека, даже не играющего</li>
+              <li>Сдвиг синхронизации и размер шрифта под себя</li>
+            </ul>
           </div>
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.25" width="10" height="6.75" rx="1.75"/><path d="M5.5 7.25V5.1a2.5 2.5 0 0 1 4.85-.85"/><path d="M8 10v1.25"/></svg></div>
-            <h3>Без цензуры</h3>
-            <p>Треки с запиканными словами играют в оригинале по открытому списку FckCensor. Список обновляется сам, у таких треков стоит значок замка.</p>
+          <div class="stage" style="--glow: rgba(167,139,250,.22)" aria-hidden="true">
+            <div class="ui ly">
+              <div class="ly-head"><div class="cv"></div><div><b>Название трека</b><small>Исполнитель</small></div></div>
+              <p>строка, что уже прошла</p>
+              <p class="now">та, что звучит сейчас</p>
+              <p class="next">и следующая за ней</p>
+              <p>а потом ещё одна</p>
+              <div class="ly-foot"><span>LRCLIB</span><span>−0,5 с</span></div>
+            </div>
           </div>
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></div>
-            <h3>Синхронный текст</h3>
-            <p>Если у Яндекса текста нет, Tune находит его в LRCLIB. Строки подсвечиваются по ходу песни, клик по строке перематывает.</p>
+        </div>
+
+        <div class="feature flip reveal">
+          <div class="f-text">
+            <h3>Без цензуры <span class="new">лучше FckCensor</span></h3>
+            <p>Треки с запиканными словами играют в оригинале по открытому списку FckCensor. Названия и обложки — тоже без цензуры, а удалённые Яндексом треки возвращаются в альбомы.</p>
+            <ul>
+              <li>Работает без VPN: если GitHub недоступен, всё берётся с зеркала</li>
+              <li>Любой трек, альбом или исполнителя можно подменить вручную — даже своим аудиофайлом</li>
+              <li>Список треков альбома, исполнители, обложка, треки в профиле исполнителя</li>
+            </ul>
           </div>
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg></div>
-            <h3>Скачивание треков</h3>
-            <p>«Скачать файл» в меню трека сохраняет его в «Загрузки» в том качестве, в котором он играет, — с полосой загрузки.</p>
+          <div class="stage" style="--glow: rgba(74,222,128,.16)" aria-hidden="true">
+            <div class="uc">
+              <div class="ui uc-rows">
+                <div class="uc-row"><span class="n">1</span><span class="cv" style="--c: url(assets/themes/night-of-knights.webp)"></span><span class="t"><b><s>Тр*к с цензурой</s></b><small>Исполнитель</small></span><span class="d">2:41</span></div>
+                <div class="uc-row back"><span class="n">1</span><span class="cv" style="--c: url(assets/themes/night-of-knights.webp)"></span><span class="t"><b>Трек без цензуры <svg class="lock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.25" width="10" height="6.75" rx="1.75"/><path d="M5.5 7.25V5.1a2.5 2.5 0 0 1 4.85-.85"/><path d="M8 10v1.25"/></svg></b><small>Исполнитель</small></span><span class="d">2:43</span></div>
+                <div class="uc-row"><span class="n">2</span><span class="cv" style="--c: url(assets/themes/cyber-glitch.webp)"></span><span class="t"><b>Удалённый трек <svg class="lock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.25" width="10" height="6.75" rx="1.75"/><path d="M5.5 7.25V5.1a2.5 2.5 0 0 1 4.85-.85"/><path d="M8 10v1.25"/></svg></b><small>Исполнитель</small></span><span class="tag">вернулся</span></div>
+              </div>
+              <div class="ui uc-edit">
+                <h4>Подмена трека</h4>
+                <div class="uc-field"><label>Название</label><span class="uc-input">Как назвал автор</span></div>
+                <div class="uc-field"><label>Исполнители</label><span class="uc-pill">Исполнитель ✕</span><span class="uc-pill">+ feat.</span></div>
+                <div class="uc-field"><label>Аудио</label><span class="uc-pill">Свой аудиофайл…</span><span class="uc-pill y">Применить</span></div>
+              </div>
+            </div>
           </div>
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/></svg></div>
+        </div>
+
+        <div class="feature reveal">
+          <div class="f-text">
+            <h3>«Моя волна» с вашими треками <span class="new">новое</span></h3>
+            <p>Загруженные в Яндекс Музыку треки из «Мне нравится» иногда попадаются в волне вместе с её рекомендациями. А треки, которые Яндекс удалил, а «Без цензуры» вернул, звучат рядом с теми же исполнителями.</p>
+            <ul>
+              <li>Включается отдельно в настройках</li>
+              <li>Не чаще одного трека на пачку волны и без повторов</li>
+            </ul>
+          </div>
+          <div class="stage" style="--glow: rgba(56,189,248,.2)" aria-hidden="true">
+            <div class="wave">
+              <div class="orb"></div>
+              <div class="core">Моя<br />волна</div>
+              <div class="ui pill" style="left: -6px; top: 18px"><i style="--c: url(assets/themes/kokou-no-sousei.webp)"></i><span>Рекомендация<small>Исполнитель</small></span></div>
+              <div class="ui pill mine" style="right: -24px; top: 92px; animation-delay: -2s"><i style="--c: url(assets/themes/frutiger-aero.webp)"></i><span>Мой трек.mp3<small>ваш трек</small></span></div>
+              <div class="ui pill back" style="left: 6px; bottom: 30px; animation-delay: -4s"><i style="--c: url(assets/themes/cyber-glitch.webp)"></i><span>Удалённый трек<small>вернул «Без цензуры»</small></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature flip reveal">
+          <div class="f-text">
             <h3>Найткор, слоуд и реверб</h3>
-            <p>Скорость от 0,5× до 2× с выбранным шагом. Тон может идти вслед за скоростью, а реверб добавляет эхо зала.</p>
+            <p>Скорость от 0,5× до 2× прямо в плеере: клик — быстрее, колесо — по шагу, правый клик — обратно 1×. Тон может идти вслед за скоростью, а реверб добавляет эхо зала.</p>
+            <ul>
+              <li>Шаг скорости 0,05, 0,1 или 0,25</li>
+              <li>Работает вместе с эквалайзером и кроссфейдом Яндекса</li>
+            </ul>
           </div>
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.3 5.3A16.7 16.7 0 0 0 15.2 4l-.5 1a15.4 15.4 0 0 0-5.4 0l-.5-1a16.6 16.6 0 0 0-4.1 1.3C2.1 9.3 1.4 13.1 1.7 16.9a16.8 16.8 0 0 0 5.1 2.6l1.1-1.7c-.6-.2-1.2-.5-1.7-.9l.4-.3a11.9 11.9 0 0 0 10.6 0l.4.3c-.5.4-1.1.7-1.7.9l1.1 1.7a16.7 16.7 0 0 0 5.1-2.6c.4-4.4-.7-8.2-2.8-11.6ZM8.7 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm6.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg></div>
-            <h3>Статус в Discord</h3>
-            <p>«Слушает …» с обложкой, временем трека и ссылками на трек, альбом или исполнителя. Регистрировать своё приложение не нужно.</p>
+          <div class="stage" style="--glow: rgba(249,115,22,.2)" aria-hidden="true">
+            <div class="ui fx">
+              <div class="bars" id="bars"></div>
+              <div class="fx-row"><span>Скорость</span><span class="speed"><span>0,75×</span><span>1×</span><span class="on">1,25×</span><span>1,5×</span></span></div>
+              <div class="fx-row"><span>Тон вслед за скоростью<small>найткор и слоуд</small></span><span class="sw"></span></div>
+              <div class="fx-row"><span>Реверб<small>35 %</small></span><span class="range"></span></div>
+            </div>
           </div>
-          <div class="card">
+        </div>
+
+        <div class="feature reveal">
+          <div class="f-text">
+            <h3>Скачивание и статус в Discord</h3>
+            <p>«Скачать файл» в меню трека сохраняет его в «Загрузки» в том качестве, в котором он играет. А друзья в Discord видят, что вы слушаете — с обложкой, временем и кнопками.</p>
+            <ul>
+              <li>Полоса загрузки и «Показать» в проводнике</li>
+              <li>Регистрировать своё приложение Discord не нужно</li>
+            </ul>
+          </div>
+          <div class="stage" style="--glow: rgba(88,101,242,.24)" aria-hidden="true">
+            <div class="dd">
+              <div class="ui toast"><span class="cv"></span><span>Исполнитель — Название трека</span><span class="pc">64 %</span><span class="bar"><i></i></span></div>
+              <div class="ui discord">
+                <div class="lbl">Слушает Яндекс Музыку</div>
+                <div class="body">
+                  <div class="cv"></div>
+                  <div style="flex: 1; min-width: 0"><b>Название трека</b><span>Исполнитель</span><span>Альбом</span><div class="time"><span>1:12</span><i></i><span>2:51</span></div></div>
+                </div>
+                <div class="btns"><span>Слушать</span><span>Tune Music</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <p class="kicker">И ещё</p>
+        <h2>Мелочи, которые приятно иметь</h2>
+        <p class="section-lead">Tune ведёт себя как нормальное настольное приложение.</p>
+        <div class="grid">
+          <div class="card reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 9h3l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6" stroke-linecap="round"/></svg></div>
             <h3>Удобное управление</h3>
             <p>Громкость колесом мыши, горячие клавиши, медиаклавиши и панель Windows, трек в заголовке окна, сворачивание в трей.</p>
           </div>
-          <div class="card">
+          <div class="card reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></div>
+            <h3>Обновляется сам</h3>
+            <p>При запуске Tune проверяет новую версию и предлагает «Обновить» — скачает и поставит её без лишних окон.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/></svg></div>
+            <h3>Помнит последний трек</h3>
+            <p>После перезапуска в плеере остаётся трек, который играл, и его очередь — даже если сервер Яндекса их не вернул.</p>
+          </div>
+          <div class="card reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
             <h3>Проверенный интерфейс</h3>
             <p>Tune скачивает интерфейс Яндекс Музыки с сервера Яндекса и сверяет подпись SHA-512. Официальный клиент не нужен.</p>
           </div>
-          <div class="card">
+          <div class="card reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg></div>
             <h3>Один процесс для VPN</h3>
             <p>Весь трафик идёт через процесс Tune — удобно, если VPN настроен только для отдельных программ.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9.5 17 19 7"/></svg></div>
+            <h3>Не нагружает ПК</h3>
+            <p>Свёрнутое или закрытое другими окнами приложение не рисуется — музыка играет, а процессор отдыхает.</p>
           </div>
         </div>
       </div>
@@ -223,30 +538,36 @@
 
     <section id="install">
       <div class="wrap">
-        <h2>Установка</h2>
+        <p class="kicker">Установка</p>
+        <h2>Три шага до музыки</h2>
         <p class="section-lead">Нужен Windows 10 или 11 — WebView2 в них уже есть.</p>
         <div class="steps">
-          <div class="step"><h3>Скачайте</h3><p>Установщик или переносную версию — одним файлом, без установки.</p></div>
-          <div class="step"><h3>Запустите</h3><p>При первом запуске Tune сам загрузит и проверит интерфейс Яндекс Музыки.</p></div>
-          <div class="step"><h3>Войдите</h3><p>Через Яндекс ID, как в официальном клиенте. Темы и аддоны — в окне «Tune».</p></div>
+          <div class="step reveal"><h3>Скачайте</h3><p>Установщик или переносную версию — одним файлом, без установки.</p></div>
+          <div class="step reveal"><h3>Запустите</h3><p>При первом запуске Tune сам загрузит и проверит интерфейс Яндекс Музыки.</p></div>
+          <div class="step reveal"><h3>Войдите</h3><p>Через Яндекс ID, как в официальном клиенте. Темы и аддоны — в окне «Tune».</p></div>
         </div>
       </div>
     </section>
 
     <section id="faq">
       <div class="wrap">
-        <h2>Вопросы</h2>
+        <p class="kicker">Вопросы</p>
+        <h2>Частые вопросы</h2>
         <details>
           <summary>Нужен ли официальный клиент Яндекс Музыки?</summary>
           <p>Нет. Tune сам скачивает проверенную версию интерфейса с сервера Яндекса и сверяет её подпись.</p>
         </details>
         <details>
           <summary>Какие аддоны подойдут?</summary>
-          <p>Темы и скрипты PulseSync и Next Music. Аддоны, сделанные только под новый SDK PulseSync 2, в Tune не запускаются — в окне Tune у них стоит пометка. Для FckCensor есть встроенная замена: «Без цензуры».</p>
+          <p>Темы и скрипты PulseSync и Next Music. Аддоны, сделанные только под новый SDK PulseSync 2, в Tune не запускаются — в окне Tune у них стоит пометка. Для FckCensor есть встроенная замена: «Без цензуры», и она умеет больше.</p>
+        </details>
+        <details>
+          <summary>Как подменить трек вручную?</summary>
+          <p>Откройте меню «…» у трека, альбома или исполнителя и выберите «Подменить…». Можно поменять название, исполнителей, обложку, поставить свой аудиофайл, изменить список треков альбома или добавить треки в профиль исполнителя.</p>
         </details>
         <details>
           <summary>Где Tune хранит данные?</summary>
-          <p>В папке <code>%APPDATA%\dev.tune.music</code>: аддоны, настройки и скачанный интерфейс.</p>
+          <p>В папке <code>%APPDATA%\dev.tune.music</code>: аддоны, настройки, файлы подмены и скачанный интерфейс.</p>
         </details>
         <details>
           <summary>Windows предупреждает о неизвестном издателе</summary>
@@ -254,11 +575,26 @@
         </details>
       </div>
     </section>
+
+    <section class="final">
+      <div class="wrap">
+        <h2>Попробуйте Tune</h2>
+        <p class="section-lead">Бесплатно и с открытым кодом. Обновления приходят сами.</p>
+        <div class="cta">
+          <a class="btn btn-primary dl-setup" href="https://github.com/tune-music/tune/releases/latest">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+            Скачать для Windows
+          </a>
+          <a class="btn" href="https://github.com/tune-music/tune">Исходный код</a>
+        </div>
+        <p class="meta dl-meta"></p>
+      </div>
+    </section>
   </main>
 
   <footer>
     <div class="wrap">
-      <span>Tune — независимый проект, не связанный с Яндексом. «Яндекс Музыка» — товарный знак ООО «Яндекс».</span>
+      <span>Tune — независимый проект, не связанный с Яндексом. «Яндекс Музыка» — товарный знак ООО «Яндекс». Арты тем — из тем организации tune-music.</span>
       <a href="https://github.com/tune-music/tune">github.com/tune-music/tune</a>
     </div>
   </footer>
@@ -271,12 +607,37 @@
         const find = (re) => (rel.assets || []).find((a) => re.test(a.name));
         const setup = find(/setup\.exe$/i);
         const portable = find(/portable\.exe$/i);
-        if (setup) document.getElementById('dl-setup').href = setup.browser_download_url;
-        if (portable) document.getElementById('dl-portable').href = portable.browser_download_url;
+        if (setup) document.querySelectorAll('.dl-setup').forEach((a) => (a.href = setup.browser_download_url));
+        if (portable) document.querySelectorAll('.dl-portable').forEach((a) => (a.href = portable.browser_download_url));
         const mb = setup ? ` · ${(setup.size / 1048576).toFixed(1).replace('.', ',')} МБ` : '';
-        document.getElementById('dl-meta').textContent = `Версия ${String(rel.tag_name).replace(/^v/, '')}${mb}`;
+        document.querySelectorAll('.dl-meta').forEach((m) => (m.textContent = `Версия ${String(rel.tag_name).replace(/^v/, '')}${mb}`));
       })
       .catch(() => {});
+
+    // Эквалайзер на иллюстрации скорости.
+    const bars = document.getElementById('bars');
+    for (let i = 0; i < 28; i++) {
+      const b = document.createElement('i');
+      b.style.height = `${30 + Math.round(Math.abs(Math.sin(i * 0.7)) * 70)}%`;
+      b.style.animationDelay = `${(-i * 0.13).toFixed(2)}s`;
+      b.style.animationDuration = `${(0.8 + (i % 5) * 0.12).toFixed(2)}s`;
+      bars.append(b);
+    }
+
+    // Текст песни на иллюстрации идёт по строкам.
+    const lines = [...document.querySelectorAll('.ly p')];
+    let at = 1;
+    setInterval(() => {
+      at = (at + 1) % lines.length;
+      lines.forEach((p, i) => {
+        p.classList.toggle('now', i === at);
+        p.classList.toggle('next', i === (at + 1) % lines.length);
+      });
+    }, 2200);
+
+    // Блоки проявляются при прокрутке.
+    const io = new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && (e.target.classList.add('in'), io.unobserve(e.target))), { threshold: 0.15 });
+    document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
   </script>
 </body>
 </html>

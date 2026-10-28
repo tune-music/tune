@@ -60,15 +60,16 @@ impl Cipher {
     }
 }
 
-/// Ссылки только на хранилище Яндекса и версии без цензуры FckCensor: команду может
-/// вызвать и скрипт аддона.
+/// Ссылки только на хранилище Яндекса и версии без цензуры FckCensor (GitHub или его
+/// зеркало jsDelivr): команду может вызвать и скрипт аддона.
 pub fn allowed_url(url: &str) -> bool {
     let Some(rest) = url.strip_prefix("https://") else { return false };
     let host = rest.split(['/', '?', '#']).next().unwrap_or("").split(':').next().unwrap_or("");
     host == "yandex.net"
         || host.ends_with(".yandex.net")
         || host.ends_with(".yandex.ru")
-        || (rest.starts_with("raw.githubusercontent.com/Hazzz895/FckCensorData/") && !rest.contains(".."))
+        || ((rest.starts_with("raw.githubusercontent.com/Hazzz895/FckCensorData/") || rest.starts_with("cdn.jsdelivr.net/gh/Hazzz895/FckCensorData@"))
+            && !rest.contains(".."))
 }
 
 fn extension(codec: &str) -> &'static str {
@@ -191,6 +192,8 @@ mod tests {
         assert!(!allowed_url("http://strm.yandex.net/x"));
         assert!(allowed_url("https://raw.githubusercontent.com/Hazzz895/FckCensorData/refs/heads/main/tracks/1"));
         assert!(!allowed_url("https://raw.githubusercontent.com/evil/x"));
+        assert!(allowed_url("https://cdn.jsdelivr.net/gh/Hazzz895/FckCensorData@main/tracks/1"));
+        assert!(!allowed_url("https://cdn.jsdelivr.net/gh/evil/x@main/tracks/1"));
     }
 
     #[test]

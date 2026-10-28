@@ -193,8 +193,16 @@
                 <input type="checkbox" class="switch" data-key="features.keepTrack" />
               </div>
               <div class="row">
-                <div class="row-text"><div class="row-title">Без цензуры</div><div class="row-desc">Треки, у которых в Яндексе запикана или вырезана часть, играют в оригинальной версии — по открытому списку <a href="#" data-link="https://github.com/Hazzz895/FckCensorData">FckCensor</a>, он обновляется сам. У таких треков стоит значок замка.</div></div>
+                <div class="row-text"><div class="row-title">Без цензуры</div><div class="row-desc">Треки, у которых в Яндексе запикана или вырезана часть, играют в оригинальной версии — по открытому списку <a href="#" data-link="https://github.com/Hazzz895/FckCensorData">FckCensor</a>, он обновляется сам. Названия и обложки — тоже без цензуры, удалённые треки возвращаются в альбомы. Если GitHub недоступен, всё берётся с зеркала. У таких треков стоит значок замка. Свои название, исполнителей, обложку и аудио — пункт «Подменить…» в меню «…» трека, альбома или исполнителя.</div></div>
                 <input type="checkbox" class="switch" data-key="features.uncensor" />
+              </div>
+              <div class="row" data-dep="features.uncensor">
+                <div class="row-text"><div class="row-title">Восстановленные треки в «Моей волне»</div><div class="row-desc">Треки, которые Яндекс удалил, а «Без цензуры» вернул, иногда попадаются в «Моей волне» — рядом с теми же исполнителями и жанрами.</div></div>
+                <input type="checkbox" class="switch" data-key="features.uncensorWave" />
+              </div>
+              <div class="row">
+                <div class="row-text"><div class="row-title">Свои треки в «Моей волне»</div><div class="row-desc">Треки, которые вы загрузили в Яндекс Музыку и отметили «Нравится», иногда попадаются в «Моей волне» вместе с её рекомендациями.</div></div>
+                <input type="checkbox" class="switch" data-key="features.localInWave" />
               </div>
               <div class="row">
                 <div class="row-text"><div class="row-title">Скачивание треков</div><div class="row-desc">Пункт «Скачать файл» в меню «…» плеера сохраняет играющий трек в «Загрузки» в том качестве, в котором он играет.</div></div>
