@@ -560,7 +560,7 @@
 
   // ---------------------------------------------------------------------------
   // Обновление Tune: при запуске Tune находит новую версию и спрашивает здесь —
-  // «Обновить» скачивает и ставит её сам, «Пропустить» больше не спрашивает о ней.
+  // «Обновить» скачивает и ставит её сам, «Пропустить» откладывает до следующего запуска.
   // ---------------------------------------------------------------------------
   let updateCard = null;
   const updateButtons = (release) => {
@@ -569,7 +569,7 @@
     const skip = document.createElement('button');
     skip.textContent = 'Пропустить';
     skip.onclick = () => {
-      T.invoke('skip_update', { version: release.version }).catch((err) => T.toast(String(err), { error: true }));
+      T.invoke('skip_update').catch((err) => T.toast(String(err), { error: true }));
     };
     const go = document.createElement('button');
     go.className = 'tune-primary';
@@ -908,10 +908,15 @@
   let apiHeaders = null;
   let apiBase = 'https://api.music.yandex.net/';
   let myUid = '';
-  const apiFetch = async (path, init = {}) => {
+  // init.json — тело запроса в JSON (как у collection/sync).
+  const apiFetch = async (path, { json, ...init } = {}) => {
     const headers = new Headers(apiHeaders || undefined);
     headers.delete('content-type');
     headers.delete('content-length');
+    if (json !== undefined) {
+      headers.set('content-type', 'application/json');
+      init.body = JSON.stringify(json);
+    }
     const r = await origFetch(apiBase + path, { ...init, headers, credentials: 'include' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
@@ -944,6 +949,7 @@
   const TYPE_WORD = { track: 'трек', album: 'альбом', artist: 'исполнителя' };
   let albumMenu = null;
   let artistMenu = null;
+  let playlistMenuAt = 0;
   // Альбом или исполнитель, у которого открыли «…»: из свойств React у кнопки, из ссылки
   // рядом или из адреса страницы (кнопка в шапке).
   const entityOfButton = (btn, kind) => {
@@ -974,6 +980,7 @@
         if (!(e.target instanceof Element)) return;
         const al = e.target.closest('[data-test-id="ALBUM_CONTEXT_MENU_BUTTON"], [data-test-id="ALBUM_HEADER_CONTEXT_MENU_BUTTON"]');
         if (al) albumMenu = { at: performance.now(), entity: entityOfButton(al, 'album') };
+        playlistMenuAt = e.target.closest('[data-test-id="PLAYLIST_HEADER_CONTEXT_MENU_BUTTON"]') ? performance.now() : playlistMenuAt;
         const ar = e.target.closest('[data-test-id="ARTIST_CONTEXT_MENU_BUTTON"], [data-test-id="ARTIST_HEADER_CONTEXT_MENU_BUTTON"]');
         if (ar) artistMenu = { at: performance.now(), entity: entityOfButton(ar, 'artist') };
       },
@@ -983,8 +990,16 @@
   const mountSpoofMenuItem = () => {
     if (!cfg.uncensor) return;
     const menu = document.querySelector('[role="menu"]');
-    if (!menu || menu.querySelector('[data-tune="spoof-menu"]')) return;
+    if (!menu || menu.querySelector('[data-tune="spoof-menu"], [data-tune="uc-upload-all"]')) return;
     const now = performance.now();
+    // Меню в шапке плейлиста (и «Мне нравится»): загрузить треки без цензуры разом.
+    if (playlistMenuAt && now - playlistMenuAt < 2000 && playlistMenuAt > listMenuAt && playlistMenuAt > playerMenuAt) {
+      const uuid = new URLSearchParams(location.search).get('playlistUuid');
+      const ref = [...menu.querySelectorAll('[role="menuitem"]')].filter((i) => !i.dataset.tune).pop();
+      if (!uuid || !ref) return;
+      ref.after(menuItem(menu, ref, 'uc-upload-all', UPLOAD_SPRITE, 'Загрузить без цензуры…', () => openUploadPicker(uuid)));
+      return;
+    }
     let type = null;
     let id = null;
     if (now - listMenuAt < 2000 && listMenuTrack) [type, id] = ['track', listMenuTrack.id];
@@ -998,6 +1013,435 @@
     const item = menuItem(menu, ref, 'spoof-menu', EDIT_SPRITE, `Подменить ${TYPE_WORD[type]}`, () => openSpoofEditor(type, String(id)));
     if (ref.dataset.testId && /ABOUT/.test(ref.dataset.testId)) ref.before(item);
     else ref.after(item);
+    if (type === 'track' && ucFile(id)) {
+      const done = uploadedOf(id);
+      const wait = uploadBusy.has(String(id));
+      const up = menuItem(menu, ref, 'uc-upload-menu', UPLOAD_SPRITE, done ? 'Уже загружен' : wait ? 'Загружается…' : 'Загрузить без цензуры', () =>
+        wait
+          ? T.toast('Этот трек уже загружается')
+          : done
+            ? // Копию могли удалить из «Загруженного» — сверяемся с Яндексом.
+              syncUploaded(true)
+                .catch(() => {})
+                .then(() => (uploadedOf(id) ? T.toast('Версия без цензуры уже в «Загруженном»') : uploadUncensored(String(id))))
+            : uploadUncensored(String(id))
+      );
+      up.title = 'Версия без цензуры загрузится в «Загруженное» и будет играть на всех устройствах';
+      item.after(up);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // «Без цензуры на всех устройствах»: версия без цензуры загружается в «Загруженное» как
+  // свой трек — свои треки Яндекс отдаёт везде, в том числе в приложении на телефоне, где
+  // Tune нет. Путь тот же, что у кнопки «Загрузить трек»: loader/upload-url → файл на
+  // post-target → обработка → ugc/tracks/<id>/change (название и исполнитель). Если
+  // оригинал был в «Мне нравится», лайк переезжает на загруженный трек.
+  // ---------------------------------------------------------------------------
+  const UPLOAD_SPRITE = '/icons/sprite.svg#upload_xxs';
+  const UPLOADED_KEY = 'tune:uc-uploaded'; // id оригинала → id загруженного трека
+  const uploadedOf = (id) => {
+    try {
+      return (JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {})[String(id)] || null;
+    } catch (e) {
+      return null;
+    }
+  };
+  const setUploaded = (id, ugcId) => {
+    try {
+      const all = JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {};
+      all[String(id)] = ugcId;
+      localStorage.setItem(UPLOADED_KEY, JSON.stringify(all));
+    } catch (e) {}
+  };
+  // Название, исполнители и обложка трека без цензуры — как их показывает подмена.
+  const uncensoredMeta = (id, orig) => {
+    const s = spoofOf('track', id) || {};
+    const title = s.title || orig.title;
+    const artist = namesOf(Array.isArray(s.artists) && s.artists.length ? s.artists : orig.artists);
+    const coverUri = s.coverUri || (orig.albums && orig.albums[0] && orig.albums[0].coverUri) || orig.coverUri || '';
+    return { title, artist, coverUri, name: artist ? `${artist} — ${title}` : title };
+  };
+  let uploadTarget = null;
+  const uploadPlaylist = async (uid) => {
+    if (uploadTarget) return uploadTarget;
+    const lists = (await apiFetch(`users/${uid}/playlists/list`)) || [];
+    const p = lists.find((x) => x && x.title === 'Загруженное');
+    if (!p) throw new Error('Не найден плейлист «Загруженное» — загрузите любой свой трек в Яндекс Музыке, и он появится');
+    return (uploadTarget = p.kind);
+  };
+  // Что уже лежит в «Загруженном»: Яндекс сопоставляет загруженный файл с треком каталога
+  // (matchedTrack) — так узнаём и треки, загруженные раньше, с другого компьютера или без Tune.
+  let uploadsSyncedAt = 0;
+  // Список пересобирается целиком: копию, удалённую из «Загруженного», можно загрузить снова.
+  // Только что загруженные (justUploaded) держим, даже если Яндекс ещё не показал их в плейлисте.
+  const justUploaded = new Map();
+  const uploadGuessed = new Set(); // копии, для которых оригинал уже искали в этом запуске
+  const syncUploaded = async (force = false) => {
+    if (!force && Date.now() - uploadsSyncedAt < 15000) return;
+    const uid = await uidOf();
+    const pl = await apiFetch(`users/${uid}/playlists/${await uploadPlaylist(uid)}`);
+    const ids = ((pl && pl.tracks) || []).map((t) => String((t && (t.id || (t.track && t.track.id))) || '')).filter((id) => id && !/^\d+$/.test(id));
+    const present = new Set(ids);
+    let old = {};
+    try {
+      old = JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {};
+    } catch (e) {}
+    const all = {};
+    const tracks = (ids.length ? await apiTracks(ids) : []).filter(Boolean);
+    for (const t of tracks) if (t.matchedTrack && t.matchedTrack.id != null) all[String(t.matchedTrack.id)] = String(t.id);
+    // Не сопоставленные Яндексом копии узнаём по своей записи — пока они есть в «Загруженном».
+    for (const [id, ugcId] of Object.entries(old)) if (!all[id] && present.has(String(ugcId))) all[id] = String(ugcId);
+    for (const [id, ugcId] of justUploaded) if (!all[id]) all[id] = ugcId;
+    // Записи нет (загружено раньше или не из Tune) — ищем оригинал по названию и исполнителю
+    // среди треков, у которых есть версия без цензуры.
+    const known = new Set(Object.values(all));
+    const lost = tracks.filter((t) => !t.matchedTrack && !known.has(String(t.id)) && !uploadGuessed.has(String(t.id)) && t.title);
+    // Удалённые треки поиск Яндекса не находит — их сверяем со списком восстановленных.
+    const gone = lost.length && uc && uc.files.size ? await restoredTracks().catch(() => []) : [];
+    for (const t of lost) {
+      uploadGuessed.add(String(t.id));
+      const artist = normName(t.ugcArtistName || namesOf(t.artists));
+      const sameArtist = (names) => !artist || normName(names).includes(artist) || artist.includes(normName(names));
+      let hit = gone.find((x) => x.title && normName(x.title) === normName(t.title) && sameArtist(x.names) && !all[x.id]);
+      if (!hit) {
+        const res = await apiFetch(`search?text=${encodeURIComponent(`${t.ugcArtistName || namesOf(t.artists)} ${t.title}`.trim())}&type=track&page=0&nocorrect=false`).catch(() => null);
+        // В каталоге название бывает с цензурой («так по***») — сверяем и с названием из подмены.
+        const same = (r) => [r.title, (spoofOf('track', r.id) || {}).title].some((v) => v && normName(v) === normName(t.title));
+        const x = ((res && res.tracks && res.tracks.results) || []).find((r) => r && same(r) && ucFile(r.id) && !all[String(r.id)]);
+        if (x) hit = { id: String(x.id) };
+      }
+      if (hit) all[hit.id] = String(t.id);
+    }
+    try {
+      localStorage.setItem(UPLOADED_KEY, JSON.stringify(all));
+    } catch (e) {}
+    uploadsSyncedAt = Date.now();
+    // Лайкнуты и оригинал, и его копия (оригинал лайкнули до этой версии Tune) — лишний лайк
+    // оригинала снимаем: в «Мне нравится» на телефоне он висел бы недоступным дублем.
+    const likedIds = new Set((await likedAll()).map((l) => String(l && l.trackId)));
+    const doubled = Object.entries(all).filter(([id, ugcId]) => likedIds.has(id) && likedIds.has(String(ugcId)));
+    for (const [id] of doubled) await apiFetch(`users/${uid}/likes/tracks/${id}/remove`, { method: 'POST' }).catch((e) => console.warn('[tune] двойной лайк', e));
+    if (doubled.length) likesChanged();
+    // Исполнители для копий без сопоставления — у оригиналов.
+    const cache = ugcArtistCache();
+    const need = Object.entries(all).filter(([, ugcId]) => !cache[ugcId]);
+    if (need.length) {
+      const origs = new Map((await apiTracks(need.map(([id]) => id))).filter(Boolean).map((t) => [String(t.id), t]));
+      for (const [id, ugcId] of need) if (origs.get(id) && (origs.get(id).artists || []).length) cache[ugcId] = slimArtists(origs.get(id).artists);
+      saveUgcArtists(cache);
+    }
+  };
+  // Исполнители своих загруженных копий: id копии → исполнители оригинала из каталога.
+  const UGC_ARTISTS_KEY = 'tune:uc-ugc-artists';
+  let ugcArtists = null;
+  const ugcArtistCache = () => {
+    if (!ugcArtists)
+      try {
+        ugcArtists = JSON.parse(localStorage.getItem(UGC_ARTISTS_KEY) || '{}') || {};
+      } catch (e) {
+        ugcArtists = {};
+      }
+    return ugcArtists;
+  };
+  const saveUgcArtists = (cache) => {
+    ugcArtists = cache;
+    try {
+      localStorage.setItem(UGC_ARTISTS_KEY, JSON.stringify(cache));
+    } catch (e) {}
+  };
+  const slimArtists = (list) => (list || []).filter((a) => a && a.id != null).map(({ id, name, cover, various, composer, available, genres, disclaimers }) => ({ id, name, cover, various, composer, available, genres, disclaimers }));
+  // Исполнители своего загруженного трека: из сопоставления Яндекса или у оригинала.
+  const ugcArtistsOf = (t) =>
+    (t && t.matchedTrack && Array.isArray(t.matchedTrack.artists) && t.matchedTrack.artists.length ? t.matchedTrack.artists : null) || (t && ugcArtistCache()[String(t.id)]) || null;
+  // Формат по первым байтам: в списке FckCensor встречаются и m4a под видом mp3 — с чужим
+  // расширением Яндекс файл не принимает.
+  const audioExt = (u) => {
+    const s = (a, b) => String.fromCharCode(...u.slice(a, b));
+    if (s(4, 8) === 'ftyp') return 'm4a';
+    if (s(0, 4) === 'fLaC') return 'flac';
+    if (s(0, 4) === 'OggS') return 'ogg';
+    if (s(0, 4) === 'RIFF') return 'wav';
+    return 'mp3';
+  };
+  // Теги mp3 заново: в файлах FckCensor бывают чужие обложки, а у загруженного трека Яндекс
+  // показывает (и на телефоне тоже) ту, что вшита в файл. Старый тег ID3v2 убираем целиком,
+  // новый — ID3v2.3: название, исполнитель, альбом и обложка из Яндекса.
+  const retagMp3 = (u, { title, artist, album, cover }) => {
+    let start = 0;
+    if (String.fromCharCode(u[0], u[1], u[2]) === 'ID3') start = 10 + (((u[6] & 127) << 21) | ((u[7] & 127) << 14) | ((u[8] & 127) << 7) | (u[9] & 127)) + (u[5] & 0x10 ? 10 : 0);
+    const be = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+    const frame = (id, body) => [...[...id].map((c) => c.charCodeAt(0)), ...be(body.length), 0, 0, ...body];
+    const utf16 = (text) => {
+      const out = [1, 0xff, 0xfe];
+      for (const c of String(text)) for (let i = 0; i < c.length; i++) out.push(c.charCodeAt(i) & 255, c.charCodeAt(i) >> 8);
+      return out;
+    };
+    const parts = [];
+    if (title) parts.push(frame('TIT2', utf16(title)));
+    if (artist) parts.push(frame('TPE1', utf16(artist)));
+    if (album) parts.push(frame('TALB', utf16(album)));
+    const head = [];
+    let size = parts.reduce((n, p) => n + p.length, 0);
+    let pic = null;
+    if (cover) {
+      const meta = [0, ...[...'image/jpeg'].map((c) => c.charCodeAt(0)), 0, 3, 0];
+      pic = { head: [...[...'APIC'].map((c) => c.charCodeAt(0)), ...be(meta.length + cover.length), 0, 0, ...meta], data: cover };
+      size += pic.head.length + pic.data.length;
+    }
+    head.push(0x49, 0x44, 0x33, 3, 0, 0, (size >> 21) & 127, (size >> 14) & 127, (size >> 7) & 127, size & 127);
+    const blobParts = [new Uint8Array(head), ...parts.map((p) => new Uint8Array(p))];
+    if (pic) blobParts.push(new Uint8Array(pic.head), pic.data);
+    // ID3v1 в конце файла (128 байт «TAG…») — тоже старый: в нём бывает название с цензурой.
+    const end = u.length >= 128 && String.fromCharCode(u[u.length - 128], u[u.length - 127], u[u.length - 126]) === 'TAG' ? u.length - 128 : u.length;
+    blobParts.push(u.subarray(start, end));
+    return blobParts;
+  };
+  // Отправка файла: обрыв без ответа у Яндекса бывает — пробуем ещё раз с новым адресом.
+  const sendUpload = async (uid, kind, file) => {
+    let last = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise((res) => setTimeout(res, 3000 * attempt));
+      const q = new URLSearchParams({ uid, 'playlist-id': `${uid}:${kind}`, path: file.name });
+      const slot = await apiFetch(`loader/upload-url?${q}`, { method: 'POST' });
+      if (slot && slot.result === 'TOO_MANY_FILES') throw new Error('Яндекс не принимает больше загруженных треков: достигнут предел');
+      if (!slot || !slot['post-target'] || !slot['ugc-track-id']) throw new Error('Яндекс не выдал адрес для загрузки');
+      const form = new FormData();
+      form.append('file', file);
+      // Клиент шлёт файл со своей авторизацией — так же, но только на хосты Яндекса.
+      const auth = apiHeaders && /^https:\/\/[^/]+\.yandex\.(?:net|ru)\//.test(slot['post-target']) ? apiHeaders.get('authorization') : null;
+      try {
+        const sent = await origFetch(slot['post-target'], { method: 'POST', body: form, headers: auth ? { authorization: auth } : {} });
+        if (sent.ok) return String(slot['ugc-track-id']);
+        last = new Error(`Яндекс не принял файл (HTTP ${sent.status})`);
+        if (sent.status >= 400 && sent.status < 500 && sent.status !== 429) break;
+      } catch (e) {
+        last = new Error('Связь с Яндексом оборвалась при загрузке файла');
+      }
+    }
+    throw last;
+  };
+  // Треки в очереди на загрузку и загружаемые — второй раз их не берём.
+  const uploadBusy = new Set();
+  // Загруженная копия встаёт в свой плейлист на место оригинала.
+  const replaceInPlaylist = async (uid, kind, id, ugcId) => {
+    const pl = await apiFetch(`users/${uid}/playlists/${kind}`);
+    const at = ((pl && pl.tracks) || []).findIndex((t) => String((t && (t.id || (t.track && t.track.id))) || '') === id);
+    if (at < 0) return false;
+    const diff = [
+      { op: 'insert', at, tracks: [{ id: ugcId }] },
+      { op: 'delete', from: at + 1, to: at + 2 },
+    ];
+    await apiFetch(`users/${uid}/playlists/${kind}/change-relative`, { method: 'POST', body: new URLSearchParams({ diff: JSON.stringify(diff), revision: String(pl.revision) }) });
+    return true;
+  };
+  // Один трек: файл без цензуры → «Загруженное» → обработка → название; лайк и место в своём
+  // плейлисте (playlistKind) переезжают на копию. Ошибка — Error с текстом для человека.
+  const uploading = new Set();
+  const uploadOne = async (id, { playlistKind = null, step = () => {} } = {}) => {
+    if (uploading.has(id)) throw new Error('Этот трек уже загружается');
+    uploading.add(id);
+    try {
+      await syncUploaded().catch((e) => console.warn('[tune] «Загруженное»', e));
+      if (uploadedOf(id)) throw new Error('Этот трек уже в «Загруженном»');
+      const file = ucFile(id);
+      const [orig] = await apiTracks([id]);
+      if (!file || !orig) throw new Error('Не удалось найти трек');
+      const meta = uncensoredMeta(id, orig);
+      step('Скачивание…', meta);
+      let audio = null;
+      for (let attempt = 0; attempt < 3 && !audio; attempt++) {
+        if (attempt) await new Promise((res) => setTimeout(res, 2000 * attempt));
+        const r = await origFetch(file.url).catch(() => null);
+        if (r && r.ok) audio = new Uint8Array(await r.arrayBuffer());
+        else if (r && r.status === 404) break;
+      }
+      if (!audio) throw new Error('Не удалось скачать файл без цензуры');
+      const ext = audioExt(audio);
+      let parts = [audio];
+      if (ext === 'mp3') {
+        const home = albumOfTrack(id);
+        const album = (orig.albums && orig.albums[0] && orig.albums[0].title) || (home && home.title) || '';
+        const coverUri = meta.coverUri || (home && home.coverUri) || '';
+        const cover = coverUri
+          ? await origFetch(coverSrc(coverUri, '600x600'))
+              .then((c) => (c.ok ? c.arrayBuffer() : null))
+              .then((b) => (b ? new Uint8Array(b) : null))
+              .catch(() => null)
+          : null;
+        parts = retagMp3(audio, { title: meta.title, artist: meta.artist, album, cover });
+      }
+      const blob = new File(parts, `${meta.artist ? `${meta.artist} - ` : ''}${meta.title}.${ext}`.replace(/[\\/:*?"<>|]+/g, ' '));
+
+      const uid = await uidOf();
+      const kind = await uploadPlaylist(uid);
+      step('Загрузка…', meta);
+      const ugcId = await sendUpload(uid, kind, blob);
+
+      // Обработка: трек появляется, когда Яндекс разберёт файл, — обычно за полминуты.
+      step('Обработка у Яндекса…', meta);
+      let ready = null;
+      for (let i = 0; i < 60 && !ready; i++) {
+        await new Promise((res) => setTimeout(res, 3000));
+        const [t] = await apiTracks([ugcId]).catch(() => []);
+        if (t && t.state === 'playable') ready = t;
+      }
+      if (!ready) throw new Error('Файл загружен, но Яндекс ещё обрабатывает его — трек появится в «Загруженном» позже');
+      setUploaded(id, ugcId);
+      justUploaded.set(id, ugcId);
+      if ((orig.artists || []).length) saveUgcArtists({ ...ugcArtistCache(), [ugcId]: slimArtists(orig.artists) });
+      if (ready.title !== meta.title || (ready.ugcArtistName || '') !== meta.artist)
+        await apiFetch(`ugc/tracks/${ugcId}/change`, { method: 'POST', json: { title: meta.title, artist: meta.artist } }).catch((e) => console.warn('[tune] название загруженного трека', e));
+
+      // Лайк — на загруженный трек: в «Мне нравится» на телефоне останется играющая версия.
+      const liked = (await likedAll()).some((l) => l && String(l.trackId) === id);
+      if (liked) {
+        await apiFetch(`users/${uid}/likes/tracks/add?track-id=${encodeURIComponent(ugcId)}`, { method: 'POST' });
+        await apiFetch(`users/${uid}/likes/tracks/${id}/remove`, { method: 'POST' });
+        likesChanged();
+      }
+      let replaced = false;
+      if (playlistKind != null && playlistKind !== 3)
+        replaced = await replaceInPlaylist(uid, playlistKind, id, ugcId).catch((e) => (console.warn('[tune] замена в плейлисте', e), false));
+      return { ...meta, ugcId, liked, replaced };
+    } finally {
+      uploading.delete(id);
+    }
+  };
+  // Свой плейлист, который сейчас открыт: kind или null.
+  const openPlaylistKind = async () => {
+    const uuid = new URLSearchParams(location.search).get('playlistUuid');
+    if (!uuid) return null;
+    try {
+      const pl = await apiFetch(`playlist/${uuid}?richTracks=false`);
+      return pl && String(pl.uid || (pl.owner && pl.owner.uid)) === (await uidOf()) ? pl.kind : null;
+    } catch (e) {
+      return null;
+    }
+  };
+  const uploadedNotice = (text, results) =>
+    notice({
+      text,
+      sub: `Версия без цензуры играет на всех устройствах, в том числе в приложении на телефоне.${results.some((x) => x.liked) ? ' Лайки перенесены на загруженные треки.' : ''}${
+        results.some((x) => x.replaced) ? ' В плейлисте они встали на место оригиналов.' : ''
+      }`,
+      ms: 0,
+    });
+  const uploadUncensored = async (id) => {
+    if (uploadBusy.has(id)) return T.toast('Этот трек уже загружается');
+    uploadBusy.add(id);
+    const card = T.task({ text: 'Загрузка без цензуры', info: 'Подготовка…' });
+    try {
+      const res = await uploadOne(id, { playlistKind: await openPlaylistKind(), step: (info, m) => card.set({ text: m.name, cover: coverSrc(m.coverUri, '100x100'), info }) });
+      card.close(0);
+      uploadedNotice(`${res.name} — в «Загруженном»`, [res]);
+    } catch (e) {
+      console.warn('[tune] загрузка версии без цензуры', e);
+      card.set({ error: true, progress: undefined, info: '', text: e instanceof Error && e.message ? e.message : 'Не удалось загрузить трек' });
+      card.close(8000);
+    } finally {
+      uploadBusy.delete(id);
+    }
+  };
+
+  // Окно выбора: восстановленные треки плейлиста (или всех лайков) — удалённые из Яндекса
+  // отмечены сразу, треки с цензурой — по желанию. Загружаются по очереди.
+  const openUploadPicker = async (uuid) => {
+    if (!document.adoptedStyleSheets.includes(spoofSheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, spoofSheet];
+    closeSpoof();
+    const title = 'Без цензуры на всех устройствах';
+    const body = h('div', { class: 'tsp-body' }, h('div', { class: 'tsp-loading' }, 'Ищем треки без цензуры…'));
+    const foot = h('div', { class: 'tsp-foot' });
+    const card = h('div', { class: 'tsp-card', role: 'dialog', 'aria-label': title }, h('div', { class: 'tsp-head' }, h('h2', {}, title), h('button', { class: 'tsp-btn tsp-icon', title: 'Закрыть', onclick: closeSpoof }, '✕')), body, foot);
+    const root = h('div', { id: 'tune-spoof', onmousedown: (e) => e.target === root && closeSpoof() }, card);
+    document.body.append(root);
+    spoofOpen = root;
+    let kind = null;
+    let found = [];
+    try {
+      await loadUncensor();
+      const uid = await uidOf();
+      const pl = await apiFetch(`playlist/${uuid}?richTracks=false`);
+      const lk = uuid.startsWith('lk.');
+      if (String(pl.uid || (pl.owner && pl.owner.uid)) === uid) kind = pl.kind;
+      // В «Мне нравится» Яндекс не отдаёт удалённые треки — берём все лайки.
+      const ids = lk ? (await likedAll()).map((l) => String(l && l.trackId)) : (pl.tracks || []).map((t) => String(t && t.id));
+      await syncUploaded(true).catch((e) => console.warn('[tune] «Загруженное»', e));
+      const want = [...new Set(ids)].filter((id) => /^\d+$/.test(id) && ucFile(id));
+      found = (await apiTracks(want)).filter(Boolean).map((t) => {
+        const id = String(t.id);
+        return { id, gone: t.available === false, state: uploadedOf(id) ? 'done' : uploadBusy.has(id) ? 'busy' : 'free', ...uncensoredMeta(id, t) };
+      });
+      // Сначала свободные удалённые, потом свободные с цензурой, загружаемые и загруженные.
+      const rank = (t) => (t.state === 'free' ? (t.gone ? 0 : 1) : t.state === 'busy' ? 2 : 3);
+      found.sort((a, b) => rank(a) - rank(b));
+    } catch (e) {
+      console.warn('[tune] треки для загрузки', e);
+    }
+    if (spoofOpen !== root) return;
+    body.textContent = '';
+    if (!found.length) {
+      body.append(h('div', { class: 'tsp-loading' }, 'Здесь нет треков без цензуры.'));
+      foot.append(h('span', { class: 'tsp-gap' }), h('button', { class: 'tsp-btn', onclick: closeSpoof }, 'Закрыть'));
+      return;
+    }
+    const free = found.filter((t) => t.state === 'free');
+    const picked = new Set(free.filter((t) => t.gone).map((t) => t.id));
+    const go = h('button', { class: 'tsp-btn tsp-primary' });
+    const sync = () => {
+      go.textContent = picked.size ? `Загрузить (${picked.size})` : 'Загрузить';
+      go.disabled = !picked.size;
+      for (const box of list.querySelectorAll('input')) box.checked = picked.has(box.value);
+    };
+    const row = (t) =>
+      h(
+        'label',
+        { class: `tsp-item tsp-pick${t.state === 'free' ? '' : ' tsp-off'}` },
+        h('input', { type: 'checkbox', value: t.id, disabled: t.state !== 'free', onchange: (e) => (e.target.checked ? picked.add(t.id) : picked.delete(t.id), sync()) }),
+        h('img', { src: coverSrc(t.coverUri, '50x50'), alt: '' }),
+        h('span', { class: 'tsp-t' }, t.title, ' ', h('small', {}, t.artist)),
+        h('small', { class: 'tsp-tag' }, t.state === 'done' ? 'уже загружен' : t.state === 'busy' ? 'загружается…' : t.gone ? 'удалён из Яндекса' : 'с цензурой')
+      );
+    const list = h('div', { class: 'tsp-list tsp-tall' }, found.map(row));
+    body.append(
+      h('div', { class: 'tsp-note' }, 'Выбранные треки загрузятся в «Загруженное» как ваши — такие играют на всех устройствах. Лайк и место в вашем плейлисте переедут на загруженную копию.'),
+      list
+    );
+    if (!free.length) body.append(h('div', { class: 'tsp-note' }, 'Все треки здесь уже загружены или загружаются.'));
+    const all = h('button', { class: 'tsp-btn', disabled: !free.length, onclick: () => (picked.size === free.length ? picked.clear() : free.forEach((t) => picked.add(t.id)), sync()) }, 'Выбрать все');
+    go.addEventListener('click', () => {
+      const ids = found.filter((t) => picked.has(t.id));
+      closeSpoof();
+      uploadMany(ids, kind);
+    });
+    foot.append(all, h('span', { class: 'tsp-gap' }), h('button', { class: 'tsp-btn', onclick: closeSpoof }, 'Отмена'), go);
+    sync();
+  };
+  const uploadMany = async (tracks, playlistKind) => {
+    // Пока окно было открыто, часть треков могли начать загружать из другого окна или меню.
+    tracks = tracks.filter((t) => !uploadBusy.has(t.id) && !uploadedOf(t.id));
+    if (!tracks.length) return T.toast('Эти треки уже загружаются или загружены');
+    for (const t of tracks) uploadBusy.add(t.id);
+    const card = T.task({ text: 'Загрузка без цензуры', info: `0 из ${tracks.length}`, progress: 0 });
+    const done = [];
+    const failed = [];
+    for (const [i, t] of tracks.entries()) {
+      card.set({ text: t.name, cover: coverSrc(t.coverUri, '100x100'), info: `${i + 1} из ${tracks.length}`, progress: i / tracks.length });
+      try {
+        done.push(await uploadOne(t.id, { playlistKind }));
+      } catch (e) {
+        console.warn('[tune] загрузка версии без цензуры', t.id, e);
+        failed.push(t.name);
+        // Предел Яндекса — дальше пробовать нет смысла.
+        if (e instanceof Error && /предел/.test(e.message)) break;
+      } finally {
+        uploadBusy.delete(t.id);
+      }
+    }
+    for (const t of tracks) uploadBusy.delete(t.id);
+    card.close(0);
+    if (done.length) uploadedNotice(`Загружено без цензуры: ${done.length}${failed.length ? `, не вышло: ${failed.length}` : ''}`, done);
+    else T.toast(failed.length ? `Не удалось загрузить: ${failed.join(', ')}` : 'Нечего загружать', { error: !!failed.length });
   };
 
   const spoofSheet = new CSSStyleSheet();
@@ -1050,6 +1494,14 @@
     #tune-spoof .tsp-item .tsp-new { color: var(--ym-controls-color-primary-text-enabled, #fc3); }
     #tune-spoof .tsp-item button { border: 0; background: none; color: inherit; opacity: .55; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; }
     #tune-spoof .tsp-item button:hover { opacity: 1; background: rgba(255,255,255,.1); }
+    #tune-spoof .tsp-list.tsp-tall { max-height: min(420px, 50vh); }
+    #tune-spoof .tsp-item.tsp-pick { gap: 10px; cursor: pointer; flex-direction: row; font-size: 14px; opacity: 1; }
+    #tune-spoof .tsp-item.tsp-pick:hover { background: rgba(255,255,255,.05); }
+    #tune-spoof .tsp-item.tsp-pick input { width: 16px; height: 16px; flex: none; accent-color: var(--ym-controls-color-primary-text-enabled, #fc3); }
+    #tune-spoof .tsp-item.tsp-pick img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex: none; background: rgba(255,255,255,.08); }
+    #tune-spoof .tsp-item.tsp-pick.tsp-off { cursor: default; opacity: .5; }
+    #tune-spoof .tsp-item.tsp-pick.tsp-off:hover { background: none; }
+    #tune-spoof .tsp-item .tsp-tag { flex: none; opacity: .5; font-size: 12px; }
     #tune-spoof .tsp-disc { padding: 8px 12px 4px; font-size: 12px; opacity: .55; }
     #tune-spoof .tsp-switch { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; opacity: 1; cursor: pointer; }
     #tune-spoof .tsp-switch input { width: 18px; height: 18px; accent-color: var(--ym-controls-color-primary-text-enabled, #fc3); }
@@ -1547,6 +1999,7 @@
     });
   };
   // Уведомление с пояснением и кнопками: заголовок, вторая строка мельче, «Позже» и действие.
+  // ms: 0 — уведомление висит, пока его не закроют.
   const notice = ({ text, sub, cover, action, run, ms = 10000 }) => {
     if (!document.adoptedStyleSheets.includes(spoofSheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, spoofSheet];
     const card = T.task({ text, info: '', progress: undefined, cover: cover || '' });
@@ -1557,11 +2010,11 @@
       h(
         'div',
         { class: 'tune-toast-actions' },
-        h('button', { onclick: () => card.close() }, 'Позже'),
+        h('button', { onclick: () => card.close() }, action ? 'Позже' : 'Закрыть'),
         action && h('button', { class: 'tune-primary', onclick: () => (card.close(), run()) }, action)
       )
     );
-    card.close(ms);
+    if (ms) card.close(ms);
     return card;
   };
 
@@ -1584,6 +2037,22 @@
   const patchFileInfo = async (resp, reqUrl) => {
     await loadUncensor();
     const fileOf = (id) => ucFile(String(id).split(':')[0]);
+    // Запустили удалённый трек без файла — подсказываем, как дать ему свой.
+    const asked = new URL(reqUrl).searchParams;
+    for (const raw of (asked.get('trackIds') || asked.get('trackId') || '').split(',')) {
+      const id = raw.split(':')[0];
+      if (!deadTracks.has(id) || fileOf(id) || deadHinted.has(id)) continue;
+      deadHinted.add(id);
+      const meta = ym.meta();
+      const isCurrent = meta && String(meta.id) === id;
+      notice({
+        text: isCurrent ? `«${meta.title}» удалён из Яндекса` : 'Трек удалён из Яндекса',
+        sub: 'Версии без цензуры для него нет. Дайте ему свой файл: «…» → «Подменить трек» → «Аудио».',
+        cover: isCurrent ? ym.cover(meta, '100x100') : '',
+        action: 'Подменить',
+        run: () => openSpoofEditor('track', id),
+      });
+    }
     let body = null;
     if (resp.ok) {
       try {
@@ -1672,17 +2141,23 @@
   document.addEventListener(
     'click',
     (e) => {
-      const a = e.target instanceof Element && e.target.closest('a[href^="/track?"]');
-      const m = a && a.getAttribute('href').match(/trackId=(\d+)/);
+      const a = e.target instanceof Element && e.target.closest('a[href^="/track?"], a[href^="/track/"]');
+      const m = a && a.getAttribute('href').match(/^\/track(?:\?(?:.*&)?trackId=|\/)([\w-]+)/);
       if (!m || e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      // Свой загруженный трек: страницы у него нет — ссылка появилась, когда мы открыли ссылки
+      // на исполнителя.
+      if (!/^\d+$/.test(m[1])) return;
       const home = albumOfTrack(m[1]);
       if (home && window.next && window.next.router) window.next.router.push(`/album/track?albumId=${home.id}&trackId=${m[1]}`);
       else T.toast('Этот трек удалён из Яндекса — своей страницы у него нет');
     },
     true
   );
+  // Удалённые треки без файла, которые мы показали живыми: при запуске объясняем, что делать.
+  const deadTracks = new Set();
+  const deadHinted = new Set();
   const spoofData = (root) => {
     let changed = false;
     const seen = new Set();
@@ -1694,14 +2169,37 @@
         return;
       }
       const id = node.id != null ? String(node.id) : '';
+      // Свой загруженный трек, у которого известны исполнители каталога (Яндекс сопоставил его
+      // с треком или его загрузил Tune): исполнители — из каталога, а trackSource убираем — по
+      // нему клиент прячет ссылки на исполнителя, «Перейти к исполнителю» и ставит значок.
+      // Плеер без trackSource узнаёт свой трек по uuid в id.
+      const ugcArtistList = node.trackSource === 'UGC' ? ugcArtistsOf(node) : null;
+      if (ugcArtistList) {
+        node.artists = ugcArtistList;
+        delete node.trackSource;
+        changed = true;
+      }
       if (/^\d+$/.test(id)) {
         if (isTrackObj(node)) {
           const s = spoofOf('track', id);
           if (s && applySpoof(node, s)) changed = true;
           // Удалённый или закрытый в Яндексе трек, у которого есть файл, снова доступен.
+          // Пометка «modal» — окно «Трек недоступен» перед запуском. У трека с файлом (без цензуры
+          // или своим) она лишняя: он играет.
+          if (ucFile(id) && Array.isArray(node.disclaimers) && node.disclaimers.some((d) => /^modal/.test(d))) {
+            node.disclaimers = node.disclaimers.filter((d) => !/^modal/.test(d));
+            changed = true;
+          }
           if (node.available === false && ucFile(id)) {
             node.available = true;
             delete node.error;
+            changed = true;
+          } else if (node.available === false) {
+            // Удалённый трек без версии в списке: файла нет, но строка остаётся живой — с «…»,
+            // лайком и «Подменить трек», чтобы ему можно было дать свой файл.
+            node.available = true;
+            delete node.error;
+            deadTracks.add(id);
             changed = true;
           }
           // У удалённого трека Яндекс не отдаёт альбом, и плеер ведёт на несуществующую
@@ -1795,6 +2293,98 @@
     return changed;
   };
 
+  // «Мне нравится»: лайк удалённого трека Яндекс сохраняет (он есть в collection/sync), но
+  // из списка лайков и плейлиста «Мне нравится» такие треки прячет. Восстановленные — те,
+  // у которых есть файл, — возвращаем по полному списку из collection/sync.
+  const LIKED_TTL = 10 * 60 * 1000;
+  let liked = { at: 0, list: [], loading: null, changedAt: 0 };
+  const likedAll = () => {
+    if (Date.now() - liked.at < LIKED_TTL) return Promise.resolve(liked.list);
+    if (liked.loading) return liked.loading;
+    const loading = apiFetch('collection/sync', { method: 'POST', json: { likedTracks: { revision: 0 } } })
+      .then((r) => {
+        const list = r && r.values && r.values.likedTracks && r.values.likedTracks.values && r.values.likedTracks.values.liked;
+        // Если лайки поменялись, пока шёл запрос, ответ в кэш не кладём.
+        if (liked.loading === loading) liked = { ...liked, at: Date.now(), list: Array.isArray(list) ? list : [], loading: null };
+        return Array.isArray(list) ? list : liked.list;
+      })
+      .catch((e) => {
+        console.warn('[tune] лайки из collection/sync', e);
+        if (liked.loading === loading) liked = { ...liked, loading: null };
+        return liked.list;
+      });
+    liked.loading = loading;
+    return loading;
+  };
+  // Лайки поменялись — список перечитываем при следующем запросе. own — лайк поставили или
+  // сняли только что (не просто синхронизация клиента): сервер может ещё отдавать старый список.
+  const likesChanged = (own = true) => (liked = { ...liked, at: 0, loading: null, changedAt: own ? Date.now() : liked.changedAt });
+  const LIKES_CHANGED = /\/likes\/tracks\/(?:[^/?#]+\/)?(?:add|add-multiple|remove)(?:[?#]|$)|\/collection\/sync(?:[?#]|$)/;
+  // Списки лайков: users/<uid>/likes/tracks — { library: { tracks } }, плейлист «Мне нравится»
+  // (lk.<uuid>) — { tracks }; элементы { id, albumId, timestamp }, в плейлисте с richTracks
+  // ещё и сам трек. Недостающие встают по дате лайка.
+  const restoreLikes = async (data, reqUrl) => {
+    if (/\/landing-blocks\/collection\/playlist-with-likes(?:[?#]|$)/.test(reqUrl)) return restoreLikesPreview(data);
+    const lk =typeof data.playlistUuid === 'string' && data.playlistUuid.startsWith('lk.') && Array.isArray(data.tracks);
+    const lib = /\/users\/\d+\/likes\/tracks(?:[?#]|$)/.test(reqUrl) && data.library && Array.isArray(data.library.tracks);
+    if (!lk && !lib) return false;
+    if (lk && data.pager && data.pager.page > 0) return false;
+    const owner = String((lk ? data.uid || (data.owner && data.owner.uid) : data.library.uid) || '');
+    if (!owner || owner !== (await uidOf())) return false;
+    const list = lk ? data.tracks : data.library.tracks;
+    const have = new Set(list.map((t) => String(t && t.id)));
+    const add = (await likedAll()).filter((l) => l && !have.has(String(l.trackId)) && ucFile(l.trackId));
+    if (!add.length) return false;
+    const rich = lk && list.some((t) => t && t.track);
+    const tracks = rich ? new Map((await apiTracks(add.map((l) => String(l.trackId)))).map((t) => [String(t.id), t])) : null;
+    const time = (t) => Date.parse(t && t.timestamp) || 0;
+    const indexed = list.some((t) => t && 'originalIndex' in t);
+    const before = list.length;
+    for (const l of add) {
+      const item = lk ? { id: Number(l.trackId), albumId: l.albumId ? Number(l.albumId) : undefined, timestamp: l.timestamp } : { id: String(l.trackId), albumId: l.albumId, timestamp: l.timestamp };
+      if (rich) {
+        const t = tracks.get(String(l.trackId));
+        if (!t) continue;
+        item.track = t;
+      }
+      const at = list.findIndex((t) => time(t) < time(item));
+      list.splice(at < 0 ? list.length : at, 0, item);
+    }
+    const added = list.length - before;
+    if (!added) return false;
+    // Порядок в перемешанном виде у новых треков — после всех прежних.
+    if (indexed)
+      list.forEach((t, i) => {
+        t.originalIndex = i;
+        if (!('originalShuffleIndex' in t)) t.originalShuffleIndex = before + i;
+      });
+    if (lk && typeof data.trackCount === 'number') data.trackCount += added;
+    if (lk && data.pager && typeof data.pager.total === 'number') data.pager.total += added;
+    return true;
+  };
+  // Превью «Мне нравится» в коллекции: { summary: { count }, tracks: [трек] } — первые треки
+  // без дат лайка. Порядок берём из collection/sync, восстановленные треки дозапрашиваем.
+  const restoreLikesPreview = async (data) => {
+    if (!Array.isArray(data.tracks) || !data.tracks.every((t) => t && typeof t === 'object' && isTrackObj(t))) return false;
+    // В превью только первые треки — спрятанные ищем по полному списку лайков.
+    const [all, visible] = await Promise.all([likedAll(), uidOf().then((uid) => apiFetch(`users/${uid}/likes/tracks`))]);
+    const seen = new Set(((visible && visible.library && visible.library.tracks) || []).map((t) => String(t && t.id)));
+    if (!seen.size) return false;
+    const shown = new Map(data.tracks.map((t) => [String(t.id), t]));
+    const hidden = all.filter((l) => l && !seen.has(String(l.trackId)) && !shown.has(String(l.trackId)) && ucFile(l.trackId));
+    if (!hidden.length) return false;
+    const hiddenIds = new Set(hidden.map((l) => String(l.trackId)));
+    // Последний показанный трек — граница: восстановленные новее него встают в превью.
+    const last = all.findIndex((l) => l && String(l.trackId) === String(data.tracks[data.tracks.length - 1].id));
+    const order = (last < 0 ? all : all.slice(0, last + 1)).map((l) => String(l && l.trackId)).filter((id) => shown.has(id) || hiddenIds.has(id));
+    const want = order.slice(0, data.tracks.length);
+    const missing = want.filter((id) => !shown.has(id));
+    if (missing.length) for (const t of await apiTracks(missing)) if (t && t.id != null) shown.set(String(t.id), t);
+    if (missing.length) data.tracks = want.map((id) => shown.get(id)).filter(Boolean);
+    if (data.summary && typeof data.summary.count === 'number') data.summary.count += hidden.length;
+    return true;
+  };
+
   // ---------------------------------------------------------------------------
   // «Моя волна»: свои загруженные треки и восстановленные «Без цензуры» иногда
   // встают в очередь волны рядом с её рекомендациями. Пачки волны приходят ответом
@@ -1803,6 +2393,7 @@
   const WAVE_TTL = 30 * 60 * 1000;
   let waveLocal = { at: 0, list: [], loading: null };
   const waveUsed = new Set();
+  let waveInjected = false; // в прошлую пачку уже поставили свой трек
   const waveRecent = []; // исполнители и жанры последних пачек волны
   const localWaveTracks = () => {
     if (Date.now() - waveLocal.at < WAVE_TTL) return Promise.resolve(waveLocal.list);
@@ -1832,13 +2423,17 @@
         restored = JSON.parse(localStorage.getItem(RESTORED_KEY) || 'null');
       } catch (e) {}
     const sig = uc ? uc.files.size : 0;
-    if (restored && restored.sig === sig && Date.now() - restored.at < 24 * 3600 * 1000) return Promise.resolve(restored.items);
+    // В прежнем кэше не было названий — их ждёт поиск.
+    if (restored && restored.sig === sig && Date.now() - restored.at < 24 * 3600 * 1000 && restored.items.every((i) => 'title' in i)) return Promise.resolve(restored.items);
     if (!restoredLoading)
       restoredLoading = apiTracks([...uc.files.keys()])
         .then((got) => {
           const items = got
             .filter((t) => t && t.available === false)
-            .map((t) => ({ id: String(t.id), artists: (t.artists || []).map((a) => String(a.id)), genre: (t.albums && t.albums[0] && t.albums[0].genre) || '' }));
+            .map((t) => {
+              const m = uncensoredMeta(String(t.id), t);
+              return { id: String(t.id), artists: (t.artists || []).map((a) => String(a.id)), genre: (t.albums && t.albums[0] && t.albums[0].genre) || '', title: m.title, names: m.artist };
+            });
           restored = { at: Date.now(), sig, items };
           try {
             localStorage.setItem(RESTORED_KEY, JSON.stringify(restored));
@@ -1852,6 +2447,50 @@
         .finally(() => (restoredLoading = null));
     return restoredLoading;
   };
+  // Поиск: удалённые треки Яндекс не находит — восстановленные с подходящим названием (или
+  // «исполнитель + название») ставим в начало выдачи search/instant/mixed и search.
+  const injectSearch = async (data, reqUrl) => {
+    const url = new URL(reqUrl);
+    if (Number(url.searchParams.get('page') || 0) > 0) return false;
+    const types = url.searchParams.get('type') || 'all';
+    if (!/(^|,)(all|track)(,|$)/.test(types)) return false;
+    const q = normName(url.searchParams.get('text'));
+    if (q.length < 3 || !uc || !uc.files.size) return false;
+    const hits = (await restoredTracks()).filter((t) => {
+      if (!t.title || !ucFile(t.id)) return false;
+      const title = normName(t.title);
+      return title.includes(q) || normName(`${t.names} ${t.title}`).includes(q) || normName(`${t.title} ${t.names}`).includes(q);
+    });
+    if (!hits.length) return false;
+    const list = Array.isArray(data.results) ? data.results : data.tracks && Array.isArray(data.tracks.results) ? data.tracks.results : null;
+    if (!list) return false;
+    const mixed = list === data.results;
+    const have = new Set(list.map((x) => String(mixed ? x && x.track && x.track.id : x && x.id)));
+    const add = (await apiTracks(hits.map((t) => t.id).filter((id) => !have.has(id)))).filter(Boolean);
+    if (!add.length) return false;
+    list.unshift(...add.map((t) => (mixed ? { type: 'track', track: t } : t)));
+    if (!mixed && typeof data.tracks.total === 'number') data.tracks.total += add.length;
+    return true;
+  };
+  // «Знакомое вам» у исполнителя: лайки треков, переехавшие на свои загруженные копии, Яндекс
+  // к исполнителю не относит — добавляем такие копии в «У вас в Коллекции» и в её счётчик.
+  const injectFamiliar = async (data, artistId, info) => {
+    if (!data.collection || typeof data.collection !== 'object') return false;
+    const ugcIds = (await likedAll()).map((l) => String(l && l.trackId)).filter((id) => id && !/^\d+$/.test(id));
+    if (!ugcIds.length) return false;
+    const mine = (await apiTracks(ugcIds)).filter((t) => t && (ugcArtistsOf(t) || []).some((a) => String(a.id) === artistId));
+    if (!mine.length) return false;
+    if (info) {
+      if (typeof data.collection.trackCount !== 'number') return false;
+      data.collection.trackCount += mine.length;
+      return true;
+    }
+    if (!Array.isArray(data.collection.tracks)) data.collection.tracks = [];
+    const have = new Set(data.collection.tracks.map((t) => String(t && t.id)));
+    const add = mine.filter((t) => !have.has(String(t.id)));
+    data.collection.tracks.unshift(...add);
+    return add.length > 0;
+  };
   const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
   const injectWave = async (seq) => {
     const tracks = seq.map((x) => x && x.track).filter(Boolean);
@@ -1862,28 +2501,38 @@
     if (waveRecent.length > 6) waveRecent.shift();
     const near = (item) => waveRecent.some((r) => item.artists.some((a) => r.artists.has(a)));
     const sameGenre = (item) => !!item.genre && waveRecent.some((r) => r.genres.has(item.genre));
-    const add = [];
-    if (cfg.localInWave && Math.random() < 0.35) {
-      const pool = (await localWaveTracks()).filter((t) => !waveUsed.has(String(t.id)));
-      if (pool.length) add.push({ track: pickRandom(pool), liked: true });
+    // Клиент на каждый следующий трек просит новую пачку и берёт из неё только первый —
+    // свой трек ставим первым, а шанс считаем на один трек волны. Два подряд — не ставим.
+    if (waveInjected) {
+      waveInjected = false;
+      return false;
     }
+    let add = null;
     if (cfg.uncensor && cfg.uncensorWave && uc && uc.files.size) {
       const pool = (await restoredTracks()).filter((t) => !waveUsed.has(t.id) && ucFile(t.id));
       const close = pool.filter(near);
+      // Свои лайки — тоже повод: у большинства удалённых треков нет ни альбома, ни жанра, и
+      // одних совпадений по исполнителям волны почти не бывает.
+      const likedIds = new Set((await likedAll()).map((l) => String(l && l.trackId)));
+      const mine = pool.filter((t) => likedIds.has(t.id));
       const genre = pool.filter(sameGenre);
-      const choice = close.length && Math.random() < 0.5 ? pickRandom(close) : genre.length && Math.random() < 0.2 ? pickRandom(genre) : null;
+      const choice =
+        close.length && Math.random() < 0.25 ? pickRandom(close) : mine.length && Math.random() < 0.1 ? pickRandom(mine) : genre.length && Math.random() < 0.06 ? pickRandom(genre) : null;
       if (choice) {
         const [t] = await apiTracks([choice.id]);
-        if (t) add.push({ track: t, liked: false });
+        if (t) add = { track: t, liked: likedIds.has(choice.id) };
       }
     }
-    if (!add.length) return false;
-    const params = (seq.find((x) => x && x.trackParameters) || {}).trackParameters;
-    for (const a of add) {
-      waveUsed.add(String(a.track.id));
-      const at = 1 + Math.floor(Math.random() * Math.max(1, seq.length - 1));
-      seq.splice(at, 0, { type: 'track', track: a.track, liked: a.liked, ...(params ? { trackParameters: { ...params } } : {}) });
+    if (!add && cfg.localInWave && Math.random() < 0.1) {
+      const pool = (await localWaveTracks()).filter((t) => !waveUsed.has(String(t.id)));
+      if (pool.length) add = { track: pickRandom(pool), liked: true };
     }
+    if (!add) return false;
+    console.info('[tune] в волну добавлен трек', add.track.id, add.track.title);
+    waveUsed.add(String(add.track.id));
+    waveInjected = true;
+    const params = (seq.find((x) => x && x.trackParameters) || {}).trackParameters;
+    seq.unshift({ type: 'track', track: add.track, liked: add.liked, ...(params ? { trackParameters: { ...params } } : {}) });
     return true;
   };
 
@@ -1892,6 +2541,10 @@
   let healStarted = false;
   const healNoAuto = async () => {
     await loadUncensor();
+    // Список восстановленных треков нужен поиску и волне — готовим его заранее, в фоне.
+    if (uc && uc.files.size) restoredTracks().catch(() => {});
+    // «Загруженное» могли поменять с других устройств — сверяем, что уже загружено.
+    syncUploaded().catch(() => {});
     const off = Object.keys(own.track).filter((id) => own.track[id].noAuto && uc && uc.files.has(id));
     if (!off.length) return;
     let back = 0;
@@ -1941,16 +2594,99 @@
       if (/\/albums\/\d+\/with-tracks/.test(reqUrl)) await step('треки альбома', () => restoreVolumes(data));
       const art = reqUrl.match(/\/artists\/(\d+)\/(brief-info|tracks|direct-albums|safe-direct-albums)(?:[?#]|$)/);
       if (art) await step('профиль исполнителя', () => insertIntoArtist(data, art[1], !/[?&]page=(?!0(?:&|$))\d+/.test(reqUrl)));
+      await step('«Мне нравится»', () => restoreLikes(data, reqUrl));
+      if (/\/search(?:\/instant\/mixed)?\?/.test(reqUrl)) await step('поиск', () => injectSearch(data, reqUrl));
+      if (/\/collection\/sync(?:[?#]|$)/.test(reqUrl) && likedOriginals(data)) changed = true;
+      const fam = reqUrl.match(/\/artists\/(\d+)\/familiar-you(\/info)?(?:[?#]|$)/);
+      if (fam) await step('«Знакомое вам»', () => injectFamiliar(data, fam[1], !!fam[2]));
       if (spoofData(data)) changed = true;
     }
     return changed ? jsonResponse(body, resp) : resp;
   };
 
+  // id в запросах лайков: «123», «123:456» — оригинал с загруженной копией заменяем копией.
+  const swapLikeId = (raw) => {
+    const id = String(raw).split(':')[0];
+    return (cfg.uncensor && /^\d+$/.test(id) && uploadedOf(id)) || raw;
+  };
+  const swapLikeIds = (text) =>
+    text.replace(/(^|&)(track-ids?=)([^&]*)/g, (m, sep, key, value) => sep + key + encodeURIComponent(decodeURIComponent(value).split(',').map(swapLikeId).join(',')));
+  const swapLikeUrl = (url) => {
+    const [base, query] = url.split('?');
+    const path = base.replace(/(\/likes\/tracks\/)([\d:]+)(\/(?:add|remove))$/, (m, a, id, b) => a + swapLikeId(id) + b);
+    return query === undefined ? path : `${path}?${swapLikeIds(query)}`;
+  };
+  // Лайкнутая копия — значит, лайкнут и оригинал: так сердечко у оригинала в альбоме, поиске и
+  // волне не пустое. В collection/sync добавляем оригиналы рядом с их копиями.
+  const likedOriginals = (data) => {
+    const tracks = data && data.values && data.values.likedTracks;
+    const liked = tracks && tracks.values && tracks.values.liked;
+    if (!Array.isArray(liked)) return false;
+    let map = {};
+    try {
+      map = JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {};
+    } catch (e) {}
+    const byUgc = new Map(Object.entries(map).map(([id, ugcId]) => [String(ugcId), id]));
+    const have = new Set(liked.map((l) => String(l && l.trackId)));
+    const add = [];
+    for (const l of liked) {
+      const orig = l && byUgc.get(String(l.trackId));
+      if (!orig || have.has(orig)) continue;
+      add.push({ trackId: orig, timestamp: l.timestamp });
+      have.add(orig);
+    }
+    liked.push(...add);
+    return add.length > 0;
+  };
+  // То же в хранилище лайков клиента: collection/sync отдаёт список, только когда сменилась
+  // ревизия, а между ними клиент берёт лайки из своего кэша. Оригиналы с лайкнутой копией
+  // отмечаем его же действием setTracks; ревизия 0 — при следующей синхронизации сервер
+  // пришлёт полный список, и его мы тоже дополним.
+  const markOriginalsLiked = async () => {
+    const root = rootStore();
+    const lib = root && root.library;
+    if (!lib || !lib.tracks || !(lib.tracks.items instanceof Map) || typeof lib.setTracks !== 'function') return;
+    // Сразу после лайка или его снятия сервер может ещё отдавать старый список — ждём.
+    if (Date.now() - liked.changedAt < 8000 || !apiHeaders) return;
+    let map = {};
+    try {
+      map = JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {};
+    } catch (e) {}
+    if (!Object.keys(map).length) return;
+    // Лайк копии — по списку с сервера: в кэше клиента он может остаться после снятия.
+    const onServer = new Set((await likedAll()).map((l) => String(l && l.trackId)));
+    const add = Object.entries(map).filter(([id, ugcId]) => onServer.has(String(ugcId)) && !lib.isTrackLiked(id) && !lib.isTrackDisliked(id));
+    if (!add.length) return;
+    const likedList = [];
+    const dislikedList = [];
+    for (const id of lib.tracks.items.keys()) {
+      if (lib.isTrackLiked(id)) likedList.push({ trackId: id });
+      else if (lib.isTrackDisliked(id)) dislikedList.push({ trackId: id });
+    }
+    for (const [id] of add) likedList.push({ trackId: id });
+    try {
+      lib.setTracks({ info: { revision: lib.tracks.revision === 0 ? -1 : 0 }, values: { liked: likedList, disliked: dislikedList } });
+    } catch (e) {
+      console.warn('[tune] лайки оригиналов', e);
+    }
+  };
+  setInterval(() => cfg.uncensor && markOriginalsLiked().catch((e) => console.warn('[tune] лайки оригиналов', e)), 5000);
   window.fetch = function (input, init) {
     const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
     const fileInfo = /^https:\/\/[^/?#]*\.yandex\.[a-z]+\/(?:[^?#]*\/)?get-file-info(?:\/batch)?\?/.test(url);
     const api = !fileInfo && API_HOST.test(url);
     if (!fileInfo && !api) return origFetch(input, init);
+    if (api && LIKES_CHANGED.test(url)) likesChanged(!/\/collection\/sync(?:[?#]|$)/.test(url));
+    // Лайк оригинала, у которого есть своя загруженная копия, — это лайк копии.
+    if (api && /\/likes\/tracks\//.test(url)) {
+      const swapped = swapLikeUrl(url);
+      if (swapped !== url) {
+        if (input instanceof Request) input = new Request(swapped, input);
+        else input = swapped;
+      }
+      if (init && typeof init.body === 'string') init = { ...init, body: swapLikeIds(init.body) };
+      else if (init && init.body instanceof URLSearchParams) init = { ...init, body: new URLSearchParams(swapLikeIds(init.body.toString())) };
+    }
     // Заголовки запроса (авторизация) — до вызова: тело Request потом уже прочитано.
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
     if (init && init.headers) new Headers(init.headers).forEach((v, k) => headers.set(k, v));
@@ -2332,6 +3068,19 @@
   // Горячие клавиши
   // ---------------------------------------------------------------------------
   const typing = (el) => el instanceof Element && !!el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+  // Ctrl+R и F5 — перезагрузить страницу, как в браузере. Клавиши браузера в окне Tune
+  // выключены, поэтому ловим их сами, независимо от настройки горячих клавиш.
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.altKey || e.metaKey || e.repeat) return;
+      if (!((e.ctrlKey && !e.shiftKey && e.code === 'KeyR') || (!e.ctrlKey && e.code === 'F5'))) return;
+      e.preventDefault();
+      e.stopPropagation();
+      location.reload();
+    },
+    true
+  );
   window.addEventListener('keydown', (e) => {
     if (!cfg.hotkeys || typing(e.target) || e.altKey || e.metaKey) return;
     const ctrl = e.ctrlKey;
@@ -2771,10 +3520,20 @@
   setInterval(() => {
     if (lyricsOpen && !document.hidden && performance.now() - frameAt > 500) resumeFrames();
   }, 1000);
+  // В полноэкранном плеере открыли очередь — наш текст уступает место. Проверяем и в
+  // каждом кадре: если очередь открыть, пока она ещё уезжает, Яндекс возвращает её одной
+  // сменой классов, без новых узлов, и наблюдатель за страницей этого не видит.
+  const yieldToQueue = () => {
+    if (!lyricsOpen || !lyricsFull || lyricsOwn || !fsModal()) return false;
+    const store = fsStore();
+    if (!(store && store.playQueue && store.playQueue.isVisible)) return false;
+    toggleLyrics(false);
+    return true;
+  };
   const frame = () => {
     frameId = 0;
     frameAt = performance.now();
-    if (!lyricsOpen) return;
+    if (!lyricsOpen || yieldToQueue()) return;
     if (panel) {
       const playing = !!player.isPlaying();
       if (panel.classList.contains('tune-playing') !== playing) panel.classList.toggle('tune-playing', playing);
@@ -3005,12 +3764,7 @@
         if (fsModal()) {
           fsSeen = true;
           markFs();
-          // В плеере открыли очередь — наш текст уступает место.
-          const store = fsStore();
-          if (store && store.playQueue && store.playQueue.isVisible) {
-            toggleLyrics(false);
-            return;
-          }
+          if (yieldToQueue()) return;
         } else if (fsSeen) {
           fsSeen = false;
           fsOpenedByUs = false;

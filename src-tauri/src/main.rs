@@ -1104,7 +1104,8 @@ fn report_update(app: &AppHandle, detail: Value) {
     let _ = app.emit_to("manager", "update", detail);
 }
 
-/// Проверка при запуске: о новой версии спрашиваем в окне музыки, если её не пропускали.
+/// Проверка при запуске: о новой версии спрашиваем в окне музыки — при каждом запуске,
+/// пока её не поставят: «Пропустить» откладывает только до следующего.
 fn start_update_check(app: &AppHandle) {
     if !app.state::<AppState>().settings().auto_update {
         return;
@@ -1115,9 +1116,6 @@ fn start_update_check(app: &AppHandle) {
         std::thread::sleep(std::time::Duration::from_secs(5));
         let Ok(Some(rel)) = update::check() else { return };
         let state = app.state::<AppState>();
-        if state.settings().skipped_update == rel.version {
-            return;
-        }
         *state.update.lock().unwrap() = Some(rel.clone());
         report_update(&app, available(&rel));
     });
@@ -1155,10 +1153,9 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// «Пропустить»: об этой версии больше не спрашиваем, следующую предложим.
+/// «Пропустить»: до следующего запуска об обновлении не спрашиваем.
 #[tauri::command]
-fn skip_update(app: AppHandle, version: String, state: State<AppState>) -> Result<(), String> {
-    state.update_settings(|s| s.skipped_update = version)?;
+fn skip_update(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     *state.update.lock().unwrap() = None;
     report_update(&app, json!({ "state": "skipped" }));
     Ok(())

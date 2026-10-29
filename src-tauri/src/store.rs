@@ -130,7 +130,7 @@ impl Default for Features {
             download_button: false,
             uncensor: true,
             uncensor_wave: true,
-            local_in_wave: false,
+            local_in_wave: true,
             keep_track: true,
         }
     }
@@ -152,8 +152,6 @@ pub struct Settings {
     pub zoom: f64,
     /// Проверять обновления Tune при запуске.
     pub auto_update: bool,
-    /// Версия, которую пользователь пропустил: о ней больше не спрашиваем.
-    pub skipped_update: String,
     /// Идентификаторы устройства для интерфейса Яндекса (как у официального клиента).
     pub device_uuid: String,
     pub device_id: String,
@@ -172,7 +170,6 @@ impl Default for Settings {
             start_minimized: false,
             zoom: 1.0,
             auto_update: true,
-            skipped_update: String::new(),
             device_uuid: String::new(),
             device_id: String::new(),
         }
