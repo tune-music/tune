@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-station-list"
+description = "Enables the page_station_list command without any pre-configured scope."
+commands.allow = ["page_station_list"]
+
+[[permission]]
+identifier = "deny-page-station-list"
+description = "Denies the page_station_list command without any pre-configured scope."
+commands.deny = ["page_station_list"]

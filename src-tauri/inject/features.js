@@ -16,6 +16,59 @@
     .tune-pb-btn svg { width: 20px; height: 20px; }
     .tune-pb-btn.tune-on { color: var(--ym-controls-color-primary-text-enabled, #fc3); }
     [data-tune]:focus:not(:focus-visible), [data-tune].tune-mouse-focus:focus-visible { outline: none !important; box-shadow: none !important; }
+    #tune-station-btn {
+      position: fixed; top: 0; left: 0; width: 46px; height: 32px; padding: 0; border: 0; z-index: 2147482001; background: transparent;
+      display: flex; align-items: center; justify-content: center; cursor: default; app-region: no-drag; -webkit-app-region: no-drag;
+      color: var(--ym-controls-color-secondary-text-enabled, rgba(127,127,127,.9));
+    }
+    #tune-station-btn:hover { background: rgba(127,127,127,.18); }
+    #tune-station-btn.tune-on { color: var(--ym-controls-color-primary-text-enabled, #fc3); }
+    #tune-station-pop {
+      position: fixed; top: 36px; left: 8px; width: 260px; padding: 6px; border-radius: 10px; z-index: 2147482002; box-sizing: border-box;
+      background: rgba(24,24,27,.98); color: #fafafa; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 8px 30px rgba(0,0,0,.35);
+      font: 500 13px/1.4 system-ui, sans-serif; app-region: no-drag; -webkit-app-region: no-drag;
+    }
+    .tune-station-note, .tune-station-head { padding: 8px 10px; }
+    .tune-station-note { opacity: .7; }
+    .tune-station-head { font-weight: 600; }
+    .tune-station-code { padding: 4px 10px 10px; font: 700 22px/1.2 ui-monospace, Consolas, monospace; letter-spacing: 1px; user-select: text; -webkit-user-select: text; }
+    .tune-station-top { display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px; font-weight: 600; }
+    .tune-station-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; flex: none; }
+    .tune-station-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tune-station-track { display: flex; align-items: center; gap: 10px; padding: 0 10px 10px; }
+    .tune-station-track img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: none; background: rgba(255,255,255,.08); }
+    .tune-station-text { min-width: 0; }
+    .tune-station-title, .tune-station-artist { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tune-station-artist { opacity: .6; font-weight: 400; font-size: 12px; }
+    .tune-station-range {
+      --tune-fill: 0%; appearance: none; -webkit-appearance: none; display: block; flex: 1; min-width: 0; width: calc(100% - 20px); height: 16px; margin: 0 10px; padding: 0; background: transparent; cursor: pointer;
+    }
+    .tune-station-range::-webkit-slider-runnable-track {
+      height: 4px; border-radius: 2px;
+      background: linear-gradient(to right, var(--ym-controls-color-primary-text-enabled, #fc3) var(--tune-fill), rgba(255,255,255,.18) var(--tune-fill));
+    }
+    .tune-station-range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+    .tune-station-range:focus-visible { outline: 2px solid rgba(255,255,255,.5); outline-offset: 3px; }
+    .tune-station-times { display: flex; justify-content: space-between; padding: 0 10px; font-size: 11px; opacity: .6; font-variant-numeric: tabular-nums; }
+    .tune-station-ctls { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 10px 10px; }
+    .tune-station-ctl { width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .tune-station-ctl:hover { background: rgba(255,255,255,.1); }
+    .tune-station-ctl.tune-station-main { width: 42px; height: 42px; background: var(--ym-controls-color-primary-text-enabled, #fc3); color: #000; }
+    .tune-station-ctl.tune-station-main:hover { background: var(--ym-controls-color-primary-text-enabled, #fc3); filter: brightness(1.08); }
+    .tune-station-volrow { display: flex; align-items: center; gap: 8px; padding: 0 10px 8px; }
+    .tune-station-volrow .tune-station-range { margin: 0; width: auto; }
+    .tune-station-volval { width: 40px; text-align: right; font-size: 11px; opacity: .7; font-variant-numeric: tabular-nums; }
+    .tune-station-off { text-align: center; opacity: .75; }
+    .tune-station-mute { width: 28px; height: 28px; flex: none; }
+    .tune-station-switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; cursor: pointer; }
+    .tune-station-switch input { accent-color: var(--ym-controls-color-primary-text-enabled, #fc3); width: 16px; height: 16px; margin: 0; cursor: pointer; }
+    .tune-station-hint { padding: 2px 10px 8px; font-size: 11px; font-weight: 400; opacity: .6; }
+    .tune-station-row {
+      display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+    }
+    .tune-station-row:hover { background: rgba(255,255,255,.08); }
+    .tune-station-row:disabled { cursor: default; background: transparent; }
+    .tune-station-row small { display: block; opacity: .6; font-weight: 400; }
     .tune-speed-label { font: 600 12px/1 system-ui, sans-serif; min-width: 26px; text-align: center; }
     /* В плеере «Моей волны» кнопки — круги 48×48: скорость тоже круг, иначе ряд перекашивается. */
     [data-test-id="VIBE_PLAYERBAR"] [data-tune="speed"] { width: 48px; height: 48px; padding: 0; flex: none; display: inline-flex; align-items: center; justify-content: center; }
@@ -1036,7 +1089,8 @@
   // свой трек — свои треки Яндекс отдаёт везде, в том числе в приложении на телефоне, где
   // Tune нет. Путь тот же, что у кнопки «Загрузить трек»: loader/upload-url → файл на
   // post-target → обработка → ugc/tracks/<id>/change (название и исполнитель). Если
-  // оригинал был в «Мне нравится», лайк переезжает на загруженный трек.
+  // оригинал был в «Мне нравится», лайк при загрузке переезжает на копию. Дальше копия —
+  // обычный свой трек: лайки оригинала и копии живут каждый сам по себе.
   // ---------------------------------------------------------------------------
   const UPLOAD_SPRITE = '/icons/sprite.svg#upload_xxs';
   const UPLOADED_KEY = 'tune:uc-uploaded'; // id оригинала → id загруженного трека
@@ -1071,12 +1125,9 @@
     return (uploadTarget = p.kind);
   };
   // Что уже лежит в «Загруженном»: Яндекс сопоставляет загруженный файл с треком каталога
-  // (matchedTrack) — так узнаём и треки, загруженные раньше, с другого компьютера или без Tune.
+  // (matchedTrack), а загруженные Tune копии записаны у нас. Список пересобирается целиком:
+  // копию, удалённую из «Загруженного», можно загрузить снова.
   let uploadsSyncedAt = 0;
-  // Список пересобирается целиком: копию, удалённую из «Загруженного», можно загрузить снова.
-  // Только что загруженные (justUploaded) держим, даже если Яндекс ещё не показал их в плейлисте.
-  const justUploaded = new Map();
-  const uploadGuessed = new Set(); // копии, для которых оригинал уже искали в этом запуске
   const syncUploaded = async (force = false) => {
     if (!force && Date.now() - uploadsSyncedAt < 15000) return;
     const uid = await uidOf();
@@ -1088,72 +1139,17 @@
       old = JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {};
     } catch (e) {}
     const all = {};
-    const tracks = (ids.length ? await apiTracks(ids) : []).filter(Boolean);
-    for (const t of tracks) if (t.matchedTrack && t.matchedTrack.id != null) all[String(t.matchedTrack.id)] = String(t.id);
-    // Не сопоставленные Яндексом копии узнаём по своей записи — пока они есть в «Загруженном».
+    for (const t of (ids.length ? await apiTracks(ids) : []).filter(Boolean)) if (t.matchedTrack && t.matchedTrack.id != null) all[String(t.matchedTrack.id)] = String(t.id);
     for (const [id, ugcId] of Object.entries(old)) if (!all[id] && present.has(String(ugcId))) all[id] = String(ugcId);
-    for (const [id, ugcId] of justUploaded) if (!all[id]) all[id] = ugcId;
-    // Записи нет (загружено раньше или не из Tune) — ищем оригинал по названию и исполнителю
-    // среди треков, у которых есть версия без цензуры.
-    const known = new Set(Object.values(all));
-    const lost = tracks.filter((t) => !t.matchedTrack && !known.has(String(t.id)) && !uploadGuessed.has(String(t.id)) && t.title);
-    // Удалённые треки поиск Яндекса не находит — их сверяем со списком восстановленных.
-    const gone = lost.length && uc && uc.files.size ? await restoredTracks().catch(() => []) : [];
-    for (const t of lost) {
-      uploadGuessed.add(String(t.id));
-      const artist = normName(t.ugcArtistName || namesOf(t.artists));
-      const sameArtist = (names) => !artist || normName(names).includes(artist) || artist.includes(normName(names));
-      let hit = gone.find((x) => x.title && normName(x.title) === normName(t.title) && sameArtist(x.names) && !all[x.id]);
-      if (!hit) {
-        const res = await apiFetch(`search?text=${encodeURIComponent(`${t.ugcArtistName || namesOf(t.artists)} ${t.title}`.trim())}&type=track&page=0&nocorrect=false`).catch(() => null);
-        // В каталоге название бывает с цензурой («так по***») — сверяем и с названием из подмены.
-        const same = (r) => [r.title, (spoofOf('track', r.id) || {}).title].some((v) => v && normName(v) === normName(t.title));
-        const x = ((res && res.tracks && res.tracks.results) || []).find((r) => r && same(r) && ucFile(r.id) && !all[String(r.id)]);
-        if (x) hit = { id: String(x.id) };
-      }
-      if (hit) all[hit.id] = String(t.id);
-    }
     try {
       localStorage.setItem(UPLOADED_KEY, JSON.stringify(all));
     } catch (e) {}
     uploadsSyncedAt = Date.now();
-    // Лайкнуты и оригинал, и его копия (оригинал лайкнули до этой версии Tune) — лишний лайк
-    // оригинала снимаем: в «Мне нравится» на телефоне он висел бы недоступным дублем.
-    const likedIds = new Set((await likedAll()).map((l) => String(l && l.trackId)));
-    const doubled = Object.entries(all).filter(([id, ugcId]) => likedIds.has(id) && likedIds.has(String(ugcId)));
-    for (const [id] of doubled) await apiFetch(`users/${uid}/likes/tracks/${id}/remove`, { method: 'POST' }).catch((e) => console.warn('[tune] двойной лайк', e));
-    if (doubled.length) likesChanged();
-    // Исполнители для копий без сопоставления — у оригиналов.
-    const cache = ugcArtistCache();
-    const need = Object.entries(all).filter(([, ugcId]) => !cache[ugcId]);
-    if (need.length) {
-      const origs = new Map((await apiTracks(need.map(([id]) => id))).filter(Boolean).map((t) => [String(t.id), t]));
-      for (const [id, ugcId] of need) if (origs.get(id) && (origs.get(id).artists || []).length) cache[ugcId] = slimArtists(origs.get(id).artists);
-      saveUgcArtists(cache);
-    }
   };
-  // Исполнители своих загруженных копий: id копии → исполнители оригинала из каталога.
-  const UGC_ARTISTS_KEY = 'tune:uc-ugc-artists';
-  let ugcArtists = null;
-  const ugcArtistCache = () => {
-    if (!ugcArtists)
-      try {
-        ugcArtists = JSON.parse(localStorage.getItem(UGC_ARTISTS_KEY) || '{}') || {};
-      } catch (e) {
-        ugcArtists = {};
-      }
-    return ugcArtists;
-  };
-  const saveUgcArtists = (cache) => {
-    ugcArtists = cache;
-    try {
-      localStorage.setItem(UGC_ARTISTS_KEY, JSON.stringify(cache));
-    } catch (e) {}
-  };
-  const slimArtists = (list) => (list || []).filter((a) => a && a.id != null).map(({ id, name, cover, various, composer, available, genres, disclaimers }) => ({ id, name, cover, various, composer, available, genres, disclaimers }));
-  // Исполнители своего загруженного трека: из сопоставления Яндекса или у оригинала.
-  const ugcArtistsOf = (t) =>
-    (t && t.matchedTrack && Array.isArray(t.matchedTrack.artists) && t.matchedTrack.artists.length ? t.matchedTrack.artists : null) || (t && ugcArtistCache()[String(t.id)]) || null;
+  // Прежние версии Tune подставляли копиям исполнителей оригинала — этот кэш больше не нужен.
+  try {
+    localStorage.removeItem('tune:uc-ugc-artists');
+  } catch (e) {}
   // Формат по первым байтам: в списке FckCensor встречаются и m4a под видом mp3 — с чужим
   // расширением Яндекс файл не принимает.
   const audioExt = (u) => {
@@ -1223,22 +1219,10 @@
   };
   // Треки в очереди на загрузку и загружаемые — второй раз их не берём.
   const uploadBusy = new Set();
-  // Загруженная копия встаёт в свой плейлист на место оригинала.
-  const replaceInPlaylist = async (uid, kind, id, ugcId) => {
-    const pl = await apiFetch(`users/${uid}/playlists/${kind}`);
-    const at = ((pl && pl.tracks) || []).findIndex((t) => String((t && (t.id || (t.track && t.track.id))) || '') === id);
-    if (at < 0) return false;
-    const diff = [
-      { op: 'insert', at, tracks: [{ id: ugcId }] },
-      { op: 'delete', from: at + 1, to: at + 2 },
-    ];
-    await apiFetch(`users/${uid}/playlists/${kind}/change-relative`, { method: 'POST', body: new URLSearchParams({ diff: JSON.stringify(diff), revision: String(pl.revision) }) });
-    return true;
-  };
-  // Один трек: файл без цензуры → «Загруженное» → обработка → название; лайк и место в своём
-  // плейлисте (playlistKind) переезжают на копию. Ошибка — Error с текстом для человека.
+  // Один трек: файл без цензуры → «Загруженное» → обработка → название → лайк на копию.
+  // Ошибка — Error с текстом для человека.
   const uploading = new Set();
-  const uploadOne = async (id, { playlistKind = null, step = () => {} } = {}) => {
+  const uploadOne = async (id, { step = () => {} } = {}) => {
     if (uploading.has(id)) throw new Error('Этот трек уже загружается');
     uploading.add(id);
     try {
@@ -1288,42 +1272,26 @@
       }
       if (!ready) throw new Error('Файл загружен, но Яндекс ещё обрабатывает его — трек появится в «Загруженном» позже');
       setUploaded(id, ugcId);
-      justUploaded.set(id, ugcId);
-      if ((orig.artists || []).length) saveUgcArtists({ ...ugcArtistCache(), [ugcId]: slimArtists(orig.artists) });
       if (ready.title !== meta.title || (ready.ugcArtistName || '') !== meta.artist)
         await apiFetch(`ugc/tracks/${ugcId}/change`, { method: 'POST', json: { title: meta.title, artist: meta.artist } }).catch((e) => console.warn('[tune] название загруженного трека', e));
 
-      // Лайк — на загруженный трек: в «Мне нравится» на телефоне останется играющая версия.
+      // Лайкнутый оригинал — в «Мне нравится» его место занимает копия.
       const liked = (await likedAll()).some((l) => l && String(l.trackId) === id);
       if (liked) {
         await apiFetch(`users/${uid}/likes/tracks/add?track-id=${encodeURIComponent(ugcId)}`, { method: 'POST' });
         await apiFetch(`users/${uid}/likes/tracks/${id}/remove`, { method: 'POST' });
         likesChanged();
       }
-      let replaced = false;
-      if (playlistKind != null && playlistKind !== 3)
-        replaced = await replaceInPlaylist(uid, playlistKind, id, ugcId).catch((e) => (console.warn('[tune] замена в плейлисте', e), false));
-      return { ...meta, ugcId, liked, replaced };
+      return { ...meta, ugcId, liked };
     } finally {
       uploading.delete(id);
-    }
-  };
-  // Свой плейлист, который сейчас открыт: kind или null.
-  const openPlaylistKind = async () => {
-    const uuid = new URLSearchParams(location.search).get('playlistUuid');
-    if (!uuid) return null;
-    try {
-      const pl = await apiFetch(`playlist/${uuid}?richTracks=false`);
-      return pl && String(pl.uid || (pl.owner && pl.owner.uid)) === (await uidOf()) ? pl.kind : null;
-    } catch (e) {
-      return null;
     }
   };
   const uploadedNotice = (text, results) =>
     notice({
       text,
-      sub: `Версия без цензуры играет на всех устройствах, в том числе в приложении на телефоне.${results.some((x) => x.liked) ? ' Лайки перенесены на загруженные треки.' : ''}${
-        results.some((x) => x.replaced) ? ' В плейлисте они встали на место оригиналов.' : ''
+      sub: `Версия без цензуры играет на всех устройствах, в том числе в приложении на телефоне, — как ваш загруженный трек.${
+        results.some((x) => x.liked) ? ' Лайки перенесены на загруженные треки.' : ''
       }`,
       ms: 0,
     });
@@ -1332,7 +1300,7 @@
     uploadBusy.add(id);
     const card = T.task({ text: 'Загрузка без цензуры', info: 'Подготовка…' });
     try {
-      const res = await uploadOne(id, { playlistKind: await openPlaylistKind(), step: (info, m) => card.set({ text: m.name, cover: coverSrc(m.coverUri, '100x100'), info }) });
+      const res = await uploadOne(id, { step: (info, m) => card.set({ text: m.name, cover: coverSrc(m.coverUri, '100x100'), info }) });
       card.close(0);
       uploadedNotice(`${res.name} — в «Загруженном»`, [res]);
     } catch (e) {
@@ -1356,14 +1324,11 @@
     const root = h('div', { id: 'tune-spoof', onmousedown: (e) => e.target === root && closeSpoof() }, card);
     document.body.append(root);
     spoofOpen = root;
-    let kind = null;
     let found = [];
     try {
       await loadUncensor();
-      const uid = await uidOf();
       const pl = await apiFetch(`playlist/${uuid}?richTracks=false`);
       const lk = uuid.startsWith('lk.');
-      if (String(pl.uid || (pl.owner && pl.owner.uid)) === uid) kind = pl.kind;
       // В «Мне нравится» Яндекс не отдаёт удалённые треки — берём все лайки.
       const ids = lk ? (await likedAll()).map((l) => String(l && l.trackId)) : (pl.tracks || []).map((t) => String(t && t.id));
       await syncUploaded(true).catch((e) => console.warn('[tune] «Загруженное»', e));
@@ -1404,7 +1369,7 @@
       );
     const list = h('div', { class: 'tsp-list tsp-tall' }, found.map(row));
     body.append(
-      h('div', { class: 'tsp-note' }, 'Выбранные треки загрузятся в «Загруженное» как ваши — такие играют на всех устройствах. Лайк и место в вашем плейлисте переедут на загруженную копию.'),
+      h('div', { class: 'tsp-note' }, 'Выбранные треки загрузятся в «Загруженное» как ваши — такие играют на всех устройствах. Лайк оригинала переедет на загруженную копию.'),
       list
     );
     if (!free.length) body.append(h('div', { class: 'tsp-note' }, 'Все треки здесь уже загружены или загружаются.'));
@@ -1412,12 +1377,12 @@
     go.addEventListener('click', () => {
       const ids = found.filter((t) => picked.has(t.id));
       closeSpoof();
-      uploadMany(ids, kind);
+      uploadMany(ids);
     });
     foot.append(all, h('span', { class: 'tsp-gap' }), h('button', { class: 'tsp-btn', onclick: closeSpoof }, 'Отмена'), go);
     sync();
   };
-  const uploadMany = async (tracks, playlistKind) => {
+  const uploadMany = async (tracks) => {
     // Пока окно было открыто, часть треков могли начать загружать из другого окна или меню.
     tracks = tracks.filter((t) => !uploadBusy.has(t.id) && !uploadedOf(t.id));
     if (!tracks.length) return T.toast('Эти треки уже загружаются или загружены');
@@ -1428,7 +1393,7 @@
     for (const [i, t] of tracks.entries()) {
       card.set({ text: t.name, cover: coverSrc(t.coverUri, '100x100'), info: `${i + 1} из ${tracks.length}`, progress: i / tracks.length });
       try {
-        done.push(await uploadOne(t.id, { playlistKind }));
+        done.push(await uploadOne(t.id));
       } catch (e) {
         console.warn('[tune] загрузка версии без цензуры', t.id, e);
         failed.push(t.name);
@@ -2169,16 +2134,6 @@
         return;
       }
       const id = node.id != null ? String(node.id) : '';
-      // Свой загруженный трек, у которого известны исполнители каталога (Яндекс сопоставил его
-      // с треком или его загрузил Tune): исполнители — из каталога, а trackSource убираем — по
-      // нему клиент прячет ссылки на исполнителя, «Перейти к исполнителю» и ставит значок.
-      // Плеер без trackSource узнаёт свой трек по uuid в id.
-      const ugcArtistList = node.trackSource === 'UGC' ? ugcArtistsOf(node) : null;
-      if (ugcArtistList) {
-        node.artists = ugcArtistList;
-        delete node.trackSource;
-        changed = true;
-      }
       if (/^\d+$/.test(id)) {
         if (isTrackObj(node)) {
           const s = spoofOf('track', id);
@@ -2297,7 +2252,7 @@
   // из списка лайков и плейлиста «Мне нравится» такие треки прячет. Восстановленные — те,
   // у которых есть файл, — возвращаем по полному списку из collection/sync.
   const LIKED_TTL = 10 * 60 * 1000;
-  let liked = { at: 0, list: [], loading: null, changedAt: 0 };
+  let liked = { at: 0, list: [], loading: null };
   const likedAll = () => {
     if (Date.now() - liked.at < LIKED_TTL) return Promise.resolve(liked.list);
     if (liked.loading) return liked.loading;
@@ -2316,9 +2271,8 @@
     liked.loading = loading;
     return loading;
   };
-  // Лайки поменялись — список перечитываем при следующем запросе. own — лайк поставили или
-  // сняли только что (не просто синхронизация клиента): сервер может ещё отдавать старый список.
-  const likesChanged = (own = true) => (liked = { ...liked, at: 0, loading: null, changedAt: own ? Date.now() : liked.changedAt });
+  // Лайки поменялись — список перечитываем при следующем запросе.
+  const likesChanged = () => (liked = { ...liked, at: 0, loading: null });
   const LIKES_CHANGED = /\/likes\/tracks\/(?:[^/?#]+\/)?(?:add|add-multiple|remove)(?:[?#]|$)|\/collection\/sync(?:[?#]|$)/;
   // Списки лайков: users/<uid>/likes/tracks — { library: { tracks } }, плейлист «Мне нравится»
   // (lk.<uuid>) — { tracks }; элементы { id, albumId, timestamp }, в плейлисте с richTracks
@@ -2394,16 +2348,25 @@
   let waveLocal = { at: 0, list: [], loading: null };
   const waveUsed = new Set();
   let waveInjected = false; // в прошлую пачку уже поставили свой трек
-  const waveRecent = []; // исполнители и жанры последних пачек волны
+  const waveRecent = []; // исполнители последних пачек волны
+  // Свои треки: лайкнутые загруженные и всё из «Загруженного» — туда же попадают и версии
+  // без цензуры, загруженные Tune. В волне они обычные свои треки.
   const localWaveTracks = () => {
     if (Date.now() - waveLocal.at < WAVE_TTL) return Promise.resolve(waveLocal.list);
     if (!waveLocal.loading)
       waveLocal.loading = (async () => {
         const uid = await uidOf();
         const likes = await apiFetch(`users/${uid}/likes/tracks`);
-        const ids = ((likes && likes.library && likes.library.tracks) || []).map((t) => String(t.id)).filter((id) => !/^\d+$/.test(id));
-        const got = ids.length ? await apiTracks(ids) : [];
-        waveLocal = { at: Date.now(), list: got.filter((t) => t && t.available !== false && (t.state == null || t.state === 'playable')), loading: null };
+        const uploads = await uploadPlaylist(uid)
+          .then((kind) => apiFetch(`users/${uid}/playlists/${kind}`))
+          .catch(() => null);
+        const ids = [...((likes && likes.library && likes.library.tracks) || []), ...((uploads && uploads.tracks) || [])]
+          .map((t) => String((t && (t.id || (t.track && t.track.id))) || ''))
+          .filter((id) => id && !/^\d+$/.test(id));
+        const got = ids.length ? await apiTracks([...new Set(ids)]) : [];
+        const liked = new Set(((likes && likes.library && likes.library.tracks) || []).map((t) => String(t && t.id)));
+        const list = got.filter((t) => t && t.available !== false && (t.state == null || t.state === 'playable')).map((track) => ({ track, liked: liked.has(String(track.id)) }));
+        waveLocal = { at: Date.now(), list, loading: null };
         return waveLocal.list;
       })().catch((e) => {
         console.warn('[tune] свои треки для волны', e);
@@ -2472,63 +2435,213 @@
     if (!mixed && typeof data.tracks.total === 'number') data.tracks.total += add.length;
     return true;
   };
-  // «Знакомое вам» у исполнителя: лайки треков, переехавшие на свои загруженные копии, Яндекс
-  // к исполнителю не относит — добавляем такие копии в «У вас в Коллекции» и в её счётчик.
-  const injectFamiliar = async (data, artistId, info) => {
-    if (!data.collection || typeof data.collection !== 'object') return false;
-    const ugcIds = (await likedAll()).map((l) => String(l && l.trackId)).filter((id) => id && !/^\d+$/.test(id));
-    if (!ugcIds.length) return false;
-    const mine = (await apiTracks(ugcIds)).filter((t) => t && (ugcArtistsOf(t) || []).some((a) => String(a.id) === artistId));
-    if (!mine.length) return false;
-    if (info) {
-      if (typeof data.collection.trackCount !== 'number') return false;
-      data.collection.trackCount += mine.length;
-      return true;
-    }
-    if (!Array.isArray(data.collection.tracks)) data.collection.tracks = [];
-    const have = new Set(data.collection.tracks.map((t) => String(t && t.id)));
-    const add = mine.filter((t) => !have.has(String(t.id)));
-    data.collection.tracks.unshift(...add);
-    return add.length > 0;
-  };
   const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
-  const injectWave = async (seq) => {
+
+  // ---------------------------------------------------------------------------
+  // Удалённые треки в волне — по вкусу. Рекомендации Яндекса считаются на его серверах и
+  // этих треков не знают, поэтому Tune оценивает их сам, по артисту: кого ставит текущая
+  // волна, кто на них похож (artists/<id>/similar) и как человек реагирует в волне —
+  // события rotor/session/<id>/feedback. Всё хранится только в этом браузере.
+  // ---------------------------------------------------------------------------
+  // tune-wave-score:start
+  const TASTE_MIN = -10;
+  const TASTE_MAX = 10;
+  const TASTE_BLOCK = -3; // артист с такой оценкой в волну не попадает
+  const WAVE_PASS = 2; // меньше — трек не подмешиваем
+  // Сколько событие волны добавляет оценке артиста.
+  const tasteDelta = (ev) => {
+    switch (ev && ev.type) {
+      case 'trackFinished': {
+        const len = Number(ev.trackLengthSeconds);
+        return !len || Number(ev.totalPlayedSeconds) / len >= 0.7 ? 1 : 0;
+      }
+      case 'skip':
+        return Number(ev.totalPlayedSeconds) < 30 ? -1 : 0;
+      case 'like':
+        return 3;
+      case 'unlike':
+        return -3;
+      case 'dislike':
+        return -5;
+      case 'undislike':
+        return 5;
+      default:
+        return 0;
+    }
+  };
+  // Оценка трека: { artists, liked }; ctx — { recent: Set, liked: [id], tasteOf(id), similarOf(id): Set | undefined }.
+  const waveScore = (item, ctx) => {
+    const artists = item.artists || [];
+    if (!artists.length) return -Infinity;
+    const tastes = artists.map(ctx.tasteOf);
+    if (tastes.some((t) => t <= TASTE_BLOCK)) return -Infinity;
+    let score = item.liked ? 2 : 0;
+    if (artists.some((a) => ctx.recent.has(a))) score += 2;
+    score += Math.max(-2, Math.min(3, Math.max(...tastes)));
+    // Похожий на артиста, которого дослушивают, — сильный довод; на артиста из волны — слабый:
+    // одного такого совпадения мало, нужны два.
+    const isSimilar = (seed) => {
+      const list = ctx.similarOf(seed);
+      return !!list && artists.some((a) => list.has(a));
+    };
+    let similar = 0;
+    for (const seed of ctx.liked) if (isSimilar(seed)) similar += 2;
+    for (const seed of ctx.recent) if (isSimilar(seed)) similar += 1;
+    return score + Math.min(2, similar);
+  };
+  const pickWeighted = (scored, random = Math.random) => {
+    const total = scored.reduce((n, x) => n + x.score, 0);
+    let at = random() * total;
+    for (const x of scored) if ((at -= x.score) < 0) return x;
+    return scored[scored.length - 1] || null;
+  };
+  // tune-wave-score:end
+
+  const readJson = (key, fallback) => {
+    try {
+      return JSON.parse(localStorage.getItem(key) || 'null') || fallback;
+    } catch (e) {
+      return fallback;
+    }
+  };
+  const writeJson = (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {}
+  };
+  // Оценки артистов: id → [оценка, когда менялась]. Старые реакции забываются: половина за 60 дней.
+  const TASTE_KEY = 'tune:wave-taste';
+  const DAY = 24 * 3600 * 1000;
+  const taste = readJson(TASTE_KEY, {});
+  const tasteOf = (id) => {
+    const t = taste[id];
+    return t ? t[0] * 0.5 ** ((Date.now() - t[1]) / (60 * DAY)) : 0;
+  };
+  const addTaste = (id, delta) => {
+    taste[id] = [Math.max(TASTE_MIN, Math.min(TASTE_MAX, tasteOf(id) + delta)), Date.now()];
+  };
+  const waveTrackArtists = new Map(); // трек из волны → его артисты: в событиях только id трека
+  const rememberWaveTrack = (t) => {
+    if (waveTrackArtists.size > 1000) waveTrackArtists.delete(waveTrackArtists.keys().next().value);
+    waveTrackArtists.set(String(t.id), (t.artists || []).map((a) => String(a.id)));
+  };
+  // Клиент может отправить событие повторно, если первая отправка не прошла.
+  const feedbackSeen = new Set();
+  const applyFeedback = (node, depth = 0) => {
+    if (!node || typeof node !== 'object' || depth > 4) return false;
+    if (Array.isArray(node)) return node.map((x) => applyFeedback(x, depth + 1)).some(Boolean);
+    const ev = node.event;
+    if (!ev || typeof ev !== 'object') return Object.values(node).map((x) => applyFeedback(x, depth + 1)).some(Boolean);
+    const delta = tasteDelta(ev);
+    const artists = waveTrackArtists.get(String(ev.trackId).split(':')[0]);
+    const key = `${ev.type}:${ev.trackId}:${ev.timestamp}`;
+    if (!delta || !artists || feedbackSeen.has(key)) return false;
+    if (feedbackSeen.size > 500) feedbackSeen.clear();
+    feedbackSeen.add(key);
+    for (const a of artists) addTaste(a, delta);
+    return true;
+  };
+  const readWaveFeedback = (input, init) => {
+    const text = input instanceof Request ? input.clone().text() : Promise.resolve(init && init.body);
+    text
+      .then((body) => typeof body === 'string' && applyFeedback(JSON.parse(body)) && writeJson(TASTE_KEY, taste))
+      .catch((e) => console.warn('[tune] реакция в волне', e));
+  };
+  // Похожие артисты: неделю в localStorage. Не больше трёх запросов на пачку и в фоне —
+  // очередь волны их не ждёт, они пригодятся следующим пачкам.
+  const SIMILAR_KEY = 'tune:wave-similar';
+  const similarCache = readJson(SIMILAR_KEY, {});
+  const similarSets = new Map();
+  const similarOf = (id) => {
+    const c = similarCache[id];
+    if (!c || Date.now() - c.at > 7 * DAY) return undefined;
+    if (!similarSets.has(id) || similarSets.get(id).at !== c.at) similarSets.set(id, { at: c.at, set: new Set(c.ids) });
+    return similarSets.get(id).set;
+  };
+  let similarBusy = false;
+  const loadSimilar = async (seeds) => {
+    const need = seeds.filter((id) => !similarOf(id)).slice(0, 3);
+    if (similarBusy || !need.length) return;
+    similarBusy = true;
+    try {
+      for (const id of need) {
+        const r = await apiFetch(`artists/${id}/similar`);
+        similarCache[id] = { at: Date.now(), ids: ((r && r.similarArtists) || []).map((a) => String(a && a.id)) };
+      }
+      writeJson(SIMILAR_KEY, similarCache);
+    } finally {
+      similarBusy = false;
+    }
+  };
+  // Сыгранные удалённые треки не повторяем неделю, и после перезапуска тоже.
+  const PLAYED_KEY = 'tune:wave-played';
+  const wavePlayed = readJson(PLAYED_KEY, {});
+  const markPlayed = (id) => {
+    for (const [k, at] of Object.entries(wavePlayed)) if (Date.now() - at > 7 * DAY) delete wavePlayed[k];
+    wavePlayed[id] = Date.now();
+    writeJson(PLAYED_KEY, wavePlayed);
+  };
+  const isDisliked = (id) => {
+    const lib = rootStore() && rootStore().library;
+    return !!(lib && typeof lib.isTrackDisliked === 'function' && lib.isTrackDisliked(id));
+  };
+  // Удалённый трек — не чаще одного на 10–15 треков волны.
+  const nextRestoredGap = () => 10 + Math.floor(Math.random() * 6);
+  let restoredGap = nextRestoredGap();
+  const pickRestored = async () => {
+    const seen = waveRecent.flatMap((r) => [...r.artists]);
+    const liked = Object.keys(taste)
+      .map((id) => [id, tasteOf(id)])
+      .filter(([, t]) => t >= 1)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([id]) => id);
+    loadSimilar([...new Set([...liked, ...seen])]).catch((e) => console.warn('[tune] похожие артисты', e));
+    if (--restoredGap > 0) return null;
+    const likedIds = new Set((await likedAll()).map((l) => String(l && l.trackId)));
+    const ctx = { recent: new Set(seen), liked, tasteOf, similarOf };
+    const scored = (await restoredTracks())
+      // Загруженные копии придут в волну как свои треки — оригинал второй раз не нужен.
+      .filter((t) => !wavePlayed[t.id] && ucFile(t.id) && !uploadedOf(t.id) && !isDisliked(t.id))
+      .map((t) => ({ id: t.id, score: waveScore({ artists: t.artists, liked: likedIds.has(t.id) }, ctx) }))
+      .filter((x) => x.score >= WAVE_PASS);
+    if (!scored.length) return null;
+    const choice = pickWeighted(scored);
+    const [track] = await apiTracks([choice.id]);
+    if (!track) return null;
+    restoredGap = nextRestoredGap();
+    markPlayed(choice.id);
+    return { track, liked: likedIds.has(choice.id) };
+  };
+
+  // first — первая пачка (rotor/session/new): в ней волна по треку или по настроению задаёт
+  // начало, её не трогаем.
+  const injectWave = async (seq, first) => {
     const tracks = seq.map((x) => x && x.track).filter(Boolean);
     if (!tracks.length) return false;
+    tracks.forEach(rememberWaveTrack);
     const artists = new Set(tracks.flatMap((t) => (t.artists || []).map((a) => String(a.id))));
-    const genres = new Set(tracks.map((t) => t.albums && t.albums[0] && t.albums[0].genre).filter(Boolean));
-    waveRecent.push({ artists, genres });
+    if (first) {
+      waveRecent.length = 0;
+      restoredGap = nextRestoredGap();
+    }
+    waveRecent.push({ artists });
     if (waveRecent.length > 6) waveRecent.shift();
-    const near = (item) => waveRecent.some((r) => item.artists.some((a) => r.artists.has(a)));
-    const sameGenre = (item) => !!item.genre && waveRecent.some((r) => r.genres.has(item.genre));
     // Клиент на каждый следующий трек просит новую пачку и берёт из неё только первый —
-    // свой трек ставим первым, а шанс считаем на один трек волны. Два подряд — не ставим.
-    if (waveInjected) {
+    // свой трек ставим первым. Два подряд — не ставим.
+    if (first || waveInjected) {
       waveInjected = false;
       return false;
     }
     let add = null;
-    if (cfg.uncensor && cfg.uncensorWave && uc && uc.files.size) {
-      const pool = (await restoredTracks()).filter((t) => !waveUsed.has(t.id) && ucFile(t.id));
-      const close = pool.filter(near);
-      // Свои лайки — тоже повод: у большинства удалённых треков нет ни альбома, ни жанра, и
-      // одних совпадений по исполнителям волны почти не бывает.
-      const likedIds = new Set((await likedAll()).map((l) => String(l && l.trackId)));
-      const mine = pool.filter((t) => likedIds.has(t.id));
-      const genre = pool.filter(sameGenre);
-      const choice =
-        close.length && Math.random() < 0.25 ? pickRandom(close) : mine.length && Math.random() < 0.1 ? pickRandom(mine) : genre.length && Math.random() < 0.06 ? pickRandom(genre) : null;
-      if (choice) {
-        const [t] = await apiTracks([choice.id]);
-        if (t) add = { track: t, liked: likedIds.has(choice.id) };
-      }
-    }
+    if (cfg.uncensor && cfg.uncensorWave && uc && uc.files.size) add = await pickRestored();
     if (!add && cfg.localInWave && Math.random() < 0.1) {
-      const pool = (await localWaveTracks()).filter((t) => !waveUsed.has(String(t.id)));
-      if (pool.length) add = { track: pickRandom(pool), liked: true };
+      const pool = (await localWaveTracks()).filter((x) => !waveUsed.has(String(x.track.id)));
+      if (pool.length) add = pickRandom(pool);
     }
     if (!add) return false;
     console.info('[tune] в волну добавлен трек', add.track.id, add.track.title);
+    rememberWaveTrack(add.track);
     waveUsed.add(String(add.track.id));
     waveInjected = true;
     const params = (seq.find((x) => x && x.trackParameters) || {}).trackParameters;
@@ -2543,8 +2656,6 @@
     await loadUncensor();
     // Список восстановленных треков нужен поиску и волне — готовим его заранее, в фоне.
     if (uc && uc.files.size) restoredTracks().catch(() => {});
-    // «Загруженное» могли поменять с других устройств — сверяем, что уже загружено.
-    syncUploaded().catch(() => {});
     const off = Object.keys(own.track).filter((id) => own.track[id].noAuto && uc && uc.files.has(id));
     if (!off.length) return;
     let back = 0;
@@ -2589,104 +2700,25 @@
         console.warn(`[tune] ${what}`, e);
       }
     };
-    if (wave && Array.isArray(data.sequence)) await step('волна', () => injectWave(data.sequence));
+    if (wave && Array.isArray(data.sequence)) await step('волна', () => injectWave(data.sequence, /\/rotor\/session\/new(?:[?#]|$)/.test(reqUrl)));
     if (uncensorOn) {
       if (/\/albums\/\d+\/with-tracks/.test(reqUrl)) await step('треки альбома', () => restoreVolumes(data));
       const art = reqUrl.match(/\/artists\/(\d+)\/(brief-info|tracks|direct-albums|safe-direct-albums)(?:[?#]|$)/);
       if (art) await step('профиль исполнителя', () => insertIntoArtist(data, art[1], !/[?&]page=(?!0(?:&|$))\d+/.test(reqUrl)));
       await step('«Мне нравится»', () => restoreLikes(data, reqUrl));
       if (/\/search(?:\/instant\/mixed)?\?/.test(reqUrl)) await step('поиск', () => injectSearch(data, reqUrl));
-      if (/\/collection\/sync(?:[?#]|$)/.test(reqUrl) && likedOriginals(data)) changed = true;
-      const fam = reqUrl.match(/\/artists\/(\d+)\/familiar-you(\/info)?(?:[?#]|$)/);
-      if (fam) await step('«Знакомое вам»', () => injectFamiliar(data, fam[1], !!fam[2]));
       if (spoofData(data)) changed = true;
     }
     return changed ? jsonResponse(body, resp) : resp;
   };
 
-  // id в запросах лайков: «123», «123:456» — оригинал с загруженной копией заменяем копией.
-  const swapLikeId = (raw) => {
-    const id = String(raw).split(':')[0];
-    return (cfg.uncensor && /^\d+$/.test(id) && uploadedOf(id)) || raw;
-  };
-  const swapLikeIds = (text) =>
-    text.replace(/(^|&)(track-ids?=)([^&]*)/g, (m, sep, key, value) => sep + key + encodeURIComponent(decodeURIComponent(value).split(',').map(swapLikeId).join(',')));
-  const swapLikeUrl = (url) => {
-    const [base, query] = url.split('?');
-    const path = base.replace(/(\/likes\/tracks\/)([\d:]+)(\/(?:add|remove))$/, (m, a, id, b) => a + swapLikeId(id) + b);
-    return query === undefined ? path : `${path}?${swapLikeIds(query)}`;
-  };
-  // Лайкнутая копия — значит, лайкнут и оригинал: так сердечко у оригинала в альбоме, поиске и
-  // волне не пустое. В collection/sync добавляем оригиналы рядом с их копиями.
-  const likedOriginals = (data) => {
-    const tracks = data && data.values && data.values.likedTracks;
-    const liked = tracks && tracks.values && tracks.values.liked;
-    if (!Array.isArray(liked)) return false;
-    let map = {};
-    try {
-      map = JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {};
-    } catch (e) {}
-    const byUgc = new Map(Object.entries(map).map(([id, ugcId]) => [String(ugcId), id]));
-    const have = new Set(liked.map((l) => String(l && l.trackId)));
-    const add = [];
-    for (const l of liked) {
-      const orig = l && byUgc.get(String(l.trackId));
-      if (!orig || have.has(orig)) continue;
-      add.push({ trackId: orig, timestamp: l.timestamp });
-      have.add(orig);
-    }
-    liked.push(...add);
-    return add.length > 0;
-  };
-  // То же в хранилище лайков клиента: collection/sync отдаёт список, только когда сменилась
-  // ревизия, а между ними клиент берёт лайки из своего кэша. Оригиналы с лайкнутой копией
-  // отмечаем его же действием setTracks; ревизия 0 — при следующей синхронизации сервер
-  // пришлёт полный список, и его мы тоже дополним.
-  const markOriginalsLiked = async () => {
-    const root = rootStore();
-    const lib = root && root.library;
-    if (!lib || !lib.tracks || !(lib.tracks.items instanceof Map) || typeof lib.setTracks !== 'function') return;
-    // Сразу после лайка или его снятия сервер может ещё отдавать старый список — ждём.
-    if (Date.now() - liked.changedAt < 8000 || !apiHeaders) return;
-    let map = {};
-    try {
-      map = JSON.parse(localStorage.getItem(UPLOADED_KEY) || '{}') || {};
-    } catch (e) {}
-    if (!Object.keys(map).length) return;
-    // Лайк копии — по списку с сервера: в кэше клиента он может остаться после снятия.
-    const onServer = new Set((await likedAll()).map((l) => String(l && l.trackId)));
-    const add = Object.entries(map).filter(([id, ugcId]) => onServer.has(String(ugcId)) && !lib.isTrackLiked(id) && !lib.isTrackDisliked(id));
-    if (!add.length) return;
-    const likedList = [];
-    const dislikedList = [];
-    for (const id of lib.tracks.items.keys()) {
-      if (lib.isTrackLiked(id)) likedList.push({ trackId: id });
-      else if (lib.isTrackDisliked(id)) dislikedList.push({ trackId: id });
-    }
-    for (const [id] of add) likedList.push({ trackId: id });
-    try {
-      lib.setTracks({ info: { revision: lib.tracks.revision === 0 ? -1 : 0 }, values: { liked: likedList, disliked: dislikedList } });
-    } catch (e) {
-      console.warn('[tune] лайки оригиналов', e);
-    }
-  };
-  setInterval(() => cfg.uncensor && markOriginalsLiked().catch((e) => console.warn('[tune] лайки оригиналов', e)), 5000);
   window.fetch = function (input, init) {
     const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
     const fileInfo = /^https:\/\/[^/?#]*\.yandex\.[a-z]+\/(?:[^?#]*\/)?get-file-info(?:\/batch)?\?/.test(url);
     const api = !fileInfo && API_HOST.test(url);
     if (!fileInfo && !api) return origFetch(input, init);
-    if (api && LIKES_CHANGED.test(url)) likesChanged(!/\/collection\/sync(?:[?#]|$)/.test(url));
-    // Лайк оригинала, у которого есть своя загруженная копия, — это лайк копии.
-    if (api && /\/likes\/tracks\//.test(url)) {
-      const swapped = swapLikeUrl(url);
-      if (swapped !== url) {
-        if (input instanceof Request) input = new Request(swapped, input);
-        else input = swapped;
-      }
-      if (init && typeof init.body === 'string') init = { ...init, body: swapLikeIds(init.body) };
-      else if (init && init.body instanceof URLSearchParams) init = { ...init, body: new URLSearchParams(swapLikeIds(init.body.toString())) };
-    }
+    if (api && LIKES_CHANGED.test(url)) likesChanged();
+    if (api && /\/rotor\/[^?#]*feedbacks?\/?(?:[?#]|$)/.test(url)) readWaveFeedback(input, init);
     // Заголовки запроса (авторизация) — до вызова: тело Request потом уже прочитано.
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
     if (init && init.headers) new Headers(init.headers).forEach((v, k) => headers.set(k, v));
@@ -2866,6 +2898,523 @@
   };
 
   // ---------------------------------------------------------------------------
+  // Станции и колонки: плеер Tune играет без звука и ведёт за собой колонку — очередь,
+  // кнопки и перемотка остаются его, колонке уходят трек, пауза и позиция.
+  // ---------------------------------------------------------------------------
+  const STATION_ICON =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="3"/><path d="M12 7h.01"/></svg>';
+  let station = null; // { id, name, ready, track, playing, pos, at, volume }
+  let stationBtn = null;
+  let stationPop = null;
+  let stationUi = null; // живые элементы панели подключённой колонки
+  const stationMuted = new Set();
+  const PC_SOUND_KEY = 'tune:station-pc-sound';
+  const stationPcSound = () => {
+    try {
+      return localStorage.getItem(PC_SOUND_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  };
+  // Звук глушим и на выходе графа Яндекса, и у самого элемента: элементы плеер меняет
+  // от трека к треку, а не все они попадают в граф.
+  const stationSilent = () => !!(station && station.ready && !stationPcSound());
+  const muteLocal = (el) => {
+    if (!el || el.muted) return;
+    el.muted = true;
+    stationMuted.add(el);
+  };
+  const unmuteLocal = () => {
+    for (const el of stationMuted) el.muted = false;
+    stationMuted.clear();
+  };
+  const stationSend = (command, value) => T.invoke('page_station_send', { command, value }).catch(() => {});
+  // После своей команды колонка какое-то время докладывает старое состояние — не верим.
+  const stationHold = (ms) => {
+    if (station) station.holdUntil = performance.now() + ms;
+  };
+  const stationCatchUp = (raw) => {
+    const pos = (ym.progress() || {}).position || 0;
+    if (pos > 3) setTimeout(() => station && station.track === raw && stationSend('rewind', (ym.progress() || {}).position || pos), 1500);
+  };
+  // Загруженного трека нет в каталоге — колонке уходит сам файл. Файл плеер получает
+  // не сразу, поэтому false — подождать и спросить ещё раз.
+  const stationPlayFile = (raw, meta, pos) => {
+    const entity = ym.entity();
+    const data = entity && entity.mediaSourceData && entity.mediaSourceData.data;
+    if (!data || 'error' in data || !data.urls || !data.urls[0]) return false;
+    T.invoke('page_station_play_file', {
+      id: raw,
+      url: data.urls[0],
+      key: data.transport === 'encraw' ? data.key || null : null,
+      codec: String(data.codec || ''),
+      title: meta.title || '',
+      artist: (meta.artists || []).map((a) => a.name).filter(Boolean).join(', '),
+      cover: ym.cover(meta, '400x400'),
+      offsetMs: Math.round((pos || 0) * 1000),
+    }).catch((e) => T.toast(`Колонка: ${e}`, { error: true }));
+    return true;
+  };
+  // Скорость на колонке не меняется — пока она подключена, плеер играет с обычной.
+  const stationClampSpeed = () => {
+    if (Math.abs((player.speed() || 1) - 1) > 0.001) player.speed(1);
+    const el = player.media();
+    if (el && el.playbackRate !== 1) el.playbackRate = 1;
+  };
+  const stationSync = () => {
+    if (!station || !station.ready) return;
+    stationClampSpeed();
+    if (stationSilent()) muteLocal(player.media());
+    const meta = ym.meta();
+    const raw = meta && String(meta.id || '').split(':')[0];
+    const pos = (ym.progress() || {}).position || 0;
+    const now = performance.now();
+    if (raw && raw !== station.track) {
+      const file = !/^\d+$/.test(raw) || meta.trackSource === 'UGC';
+      if (file && !stationPlayFile(raw, meta, pos)) return;
+      station.track = raw;
+      station.file = file;
+      station.playing = true;
+      station.pos = pos;
+      station.at = now;
+      stationHold(file ? 9000 : 5000);
+      if (!file) {
+        stationSend('playMusic', raw);
+        stationCatchUp(raw);
+      }
+      return;
+    }
+    if (!raw) return;
+    const playing = player.isPlaying();
+    if (playing !== station.playing) {
+      station.playing = playing;
+      // Поток файла после остановки не продолжить: «играть» включило бы прошлую очередь
+      // колонки. Файл запускаем заново с того же места.
+      if (playing && station.file) {
+        stationHold(9000);
+        stationPlayFile(raw, meta, pos);
+      } else {
+        stationHold(2500);
+        stationSend(playing ? 'play' : 'stop');
+      }
+    }
+    // Перемотка: позиция прыгнула. Сравниваем с прошлой позицией, а не с часами: если плеер
+    // просто подгружается, позиция стоит, и дёргать колонку незачем.
+    const moved = pos - station.pos;
+    if (moved < -2 || moved > (now - station.at) / 1000 + 3) {
+      stationHold(2500);
+      stationSend('rewind', pos);
+    }
+    station.pos = pos;
+    station.at = now;
+  };
+  // Колонка докладывает, где она на самом деле: она могла подгружаться или её остановили
+  // голосом. Звук у неё — поэтому за ней идёт плеер, а не наоборот.
+  const stationFollow = (ev) => {
+    // Сначала свои новости: перемотку, сделанную только что, нельзя принять за отставание.
+    stationSync();
+    const now = performance.now();
+    if (!station.track || now < (station.holdUntil || 0)) return;
+    if (ev.id && String(ev.id).split(':')[0] !== station.track) {
+      // Файл доиграл, и колонка сама вернулась к своей прошлой очереди: плеер тоже у конца.
+      const prog = ym.progress() || {};
+      if (prog.duration > 0 && prog.duration - prog.position < 5 && station.ended !== station.track) {
+        station.ended = station.track;
+        player.next();
+      }
+      return;
+    }
+    if (typeof ev.progress !== 'number') return;
+    const remote = !!ev.playing;
+    if (!remote && station.playing) {
+      if (ev.duration > 0 && ev.duration - ev.progress < 3) {
+        if (station.ended !== station.track) {
+          station.ended = station.track;
+          player.next();
+        }
+        return;
+      }
+      station.playing = false;
+      stationHold(2500);
+      player.pause();
+      return;
+    }
+    if (remote && !station.playing) {
+      station.playing = true;
+      stationHold(2500);
+      player.play();
+      return;
+    }
+    if (remote && Math.abs(((ym.progress() || {}).position || 0) - ev.progress) > 2) {
+      station.pos = ev.progress;
+      station.at = now;
+      stationHold(2000);
+      player.seek(ev.progress);
+    }
+  };
+  // Свёрнутому окну таймеры режут до раза в минуту, а события плеера приходят всегда.
+  document.addEventListener('timeupdate', () => station && stationSync(), true);
+  document.addEventListener('play', (e) => stationSilent() && muteLocal(e.target), true);
+  setInterval(() => {
+    if (!station) return;
+    stationSync();
+    stationPaint();
+  }, 1000);
+  const stationClosePop = () => {
+    stationPop && stationPop.remove();
+    stationPop = null;
+    stationUi = null;
+  };
+  // Колонка замолкает, плеер встаёт на паузу на том же месте: звук не должен внезапно
+  // вернуться в компьютер.
+  const stationStop = () => {
+    const was = station;
+    const wasReady = was && was.ready;
+    station = null;
+    if (wasReady) player.pause();
+    unmuteLocal();
+    T.invoke('page_station_disconnect').catch(() => {});
+    if (wasReady) {
+      if (was.speed && Math.abs(was.speed - 1) > 0.001 && !cfg.speedControl) player.speed(was.speed);
+      applySpeed();
+      applyAudioFx();
+    }
+    if (stationBtn) {
+      stationBtn.classList.remove('tune-on');
+      stationBtn.title = 'Станции и колонки';
+    }
+    stationClosePop();
+  };
+  const stationConnect = async () => {
+    try {
+      await T.invoke('page_station_connect', { id: station.id });
+    } catch (e) {
+      T.toast(String(e), { error: true });
+      stationStop();
+    }
+  };
+  const stationRow = (title, desc, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tune-station-row';
+    const t = document.createElement('span');
+    t.textContent = title;
+    b.appendChild(t);
+    if (desc) {
+      const d = document.createElement('small');
+      d.textContent = desc;
+      b.appendChild(d);
+    }
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  const stationNote = (text) => {
+    const n = document.createElement('div');
+    n.className = 'tune-station-note';
+    n.textContent = text;
+    return n;
+  };
+  // Вход в тот же аккаунт Яндекса, но с доступом к колонкам: токену страницы его не дают.
+  const stationLogin = (pop) => {
+    pop.appendChild(stationNote('Чтобы управлять колонками, Яндексу нужно отдельное подтверждение от вашего аккаунта.'));
+    pop.appendChild(
+      stationRow('Войти через Яндекс', '', async () => {
+        let login;
+        try {
+          login = await T.invoke('page_station_login_start');
+        } catch (e) {
+          T.toast(String(e), { error: true });
+          return;
+        }
+        if (stationPop !== pop) return;
+        pop.textContent = '';
+        pop.appendChild(stationNote('Откройте страницу Яндекса и введите код:'));
+        const code = document.createElement('div');
+        code.className = 'tune-station-code';
+        code.textContent = login.code;
+        pop.appendChild(code);
+        pop.appendChild(stationRow('Открыть страницу Яндекса', '', () => T.invoke('page_station_login_open').catch(() => {})));
+        const poll = async () => {
+          if (stationPop !== pop) return;
+          try {
+            if (await T.invoke('page_station_login_poll')) return stationRender();
+          } catch (e) {
+            pop.textContent = '';
+            pop.appendChild(stationNote(String(e)));
+            return;
+          }
+          setTimeout(poll, login.interval * 1000);
+        };
+        setTimeout(poll, login.interval * 1000);
+      })
+    );
+  };
+  const fmtTime = (sec) => {
+    const s = Math.max(0, Math.floor(sec || 0));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+  const setRange = (input, value) => {
+    input.value = value;
+    input.style.setProperty('--tune-fill', `${(input.max > 0 ? (value - input.min) / (input.max - input.min) : 0) * 100}%`);
+  };
+  const stationIcon = (label, svg, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tune-station-ctl';
+    b.setAttribute('aria-label', label);
+    b.title = label;
+    b.innerHTML = svg;
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  // Колонка принимает громкость десятью шагами и отвечает не сразу: шлём не чаще раза в
+  // 150 мс, а её доклады какое-то время не слушаем, чтобы ползунок не прыгал назад.
+  let volumeTimer = null;
+  const stationSetVolume = (v) => {
+    if (!station) return;
+    station.volume = Math.round(Math.min(1, Math.max(0, v)) * 10) / 10;
+    station.volumeUntil = performance.now() + 2500;
+    stationPaint();
+    if (volumeTimer) return;
+    volumeTimer = setTimeout(() => {
+      volumeTimer = null;
+      if (station) stationSend('setVolume', station.volume);
+    }, 150);
+  };
+  const stationPanel = (pop) => {
+    const el = (tag, cls, parent) => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      parent.appendChild(n);
+      return n;
+    };
+    const head = el('div', 'tune-station-top', pop);
+    el('i', 'tune-station-dot', head);
+    el('span', 'tune-station-name', head).textContent = station.name;
+    const track = el('div', 'tune-station-track', pop);
+    const cover = el('img', '', track);
+    cover.alt = '';
+    const text = el('div', 'tune-station-text', track);
+    const title = el('div', 'tune-station-title', text);
+    const artist = el('div', 'tune-station-artist', text);
+    const seek = el('input', 'tune-station-range', pop);
+    seek.type = 'range';
+    seek.min = 0;
+    seek.step = 1;
+    seek.setAttribute('aria-label', 'Позиция в треке');
+    seek.addEventListener('input', () => setRange(seek, Number(seek.value)));
+    seek.addEventListener('change', () => player.seek(Number(seek.value)));
+    const times = el('div', 'tune-station-times', pop);
+    const now = el('span', '', times);
+    const total = el('span', '', times);
+    const ctl = el('div', 'tune-station-ctls', pop);
+    const svg = (d) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="${d}"/></svg>`;
+    const PLAY_ICON = svg('M8 5v14l11-7z');
+    const PAUSE_ICON = svg('M7 5h4v14H7zM13 5h4v14h-4z');
+    ctl.appendChild(stationIcon('Предыдущий', svg('M6 5h2v14H6zM20 5v14L9 12z'), () => player.prev()));
+    const toggle = stationIcon('Пауза', PAUSE_ICON, () => player.toggle());
+    toggle.classList.add('tune-station-main');
+    ctl.appendChild(toggle);
+    ctl.appendChild(stationIcon('Следующий', svg('M16 5h2v14h-2zM4 5v14l11-7z'), () => player.next()));
+    const volRow = el('div', 'tune-station-volrow', pop);
+    const VOL_ON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    const VOL_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    const volBtn = stationIcon('Выключить звук колонки', VOL_ON, () => {
+      if (station.volume > 0) {
+        station.lastVolume = station.volume;
+        stationSetVolume(0);
+      } else stationSetVolume(station.lastVolume || 0.5);
+    });
+    volBtn.classList.add('tune-station-mute');
+    volRow.appendChild(volBtn);
+    const vol = el('input', 'tune-station-range', volRow);
+    vol.type = 'range';
+    vol.min = 0;
+    vol.max = 1;
+    vol.step = 0.1;
+    vol.setAttribute('aria-label', 'Громкость колонки');
+    const volText = el('span', 'tune-station-volval', volRow);
+    vol.addEventListener('input', () => stationSetVolume(Number(vol.value)));
+    vol.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      stationSetVolume((station.volume ?? 0.5) + (e.deltaY < 0 ? 0.1 : -0.1));
+    });
+    const sound = el('label', 'tune-station-switch', pop);
+    el('span', '', sound).textContent = 'Звук и в Tune';
+    const soundBox = el('input', '', sound);
+    soundBox.type = 'checkbox';
+    soundBox.checked = stationPcSound();
+    soundBox.addEventListener('change', () => {
+      try {
+        localStorage.setItem(PC_SOUND_KEY, soundBox.checked ? '1' : '0');
+      } catch (e) {}
+      if (soundBox.checked) unmuteLocal();
+      else muteLocal(player.media());
+      applyAudioFx();
+    });
+    if (station.speed && Math.abs(station.speed - 1) > 0.001) el('div', 'tune-station-hint', pop).textContent = `Скорость ${fmtSpeed(station.speed)} вернётся после отключения: колонка играет только с обычной.`;
+    pop.appendChild(stationRow('Отключиться', '', stationStop)).classList.add('tune-station-off');
+    stationUi = { cover, title, artist, seek, now, total, toggle, vol, volText, volBtn, VOL_ON, VOL_OFF, PLAY_ICON, PAUSE_ICON };
+    stationPaint();
+  };
+  const stationPaint = () => {
+    const ui = stationUi;
+    if (!ui || !station) return;
+    const meta = ym.meta();
+    ui.title.textContent = (meta && meta.title) || 'Ничего не играет';
+    ui.artist.textContent = meta ? (meta.artists || []).map((a) => a.name).filter(Boolean).join(', ') : '';
+    const cover = ym.cover(meta, '100x100');
+    if (ui.cover.getAttribute('src') !== cover) {
+      if (cover) ui.cover.src = cover;
+      else ui.cover.removeAttribute('src');
+    }
+    const prog = ym.progress() || {};
+    ui.seek.max = Math.max(1, Math.round(prog.duration || 0));
+    if (!ui.seek.matches(':active')) setRange(ui.seek, Math.round(prog.position || 0));
+    ui.now.textContent = fmtTime(Number(ui.seek.value));
+    ui.total.textContent = fmtTime(prog.duration);
+    const playing = player.isPlaying();
+    if (ui.toggle.dataset.playing !== String(playing)) {
+      ui.toggle.dataset.playing = String(playing);
+      ui.toggle.innerHTML = playing ? ui.PAUSE_ICON : ui.PLAY_ICON;
+      ui.toggle.title = playing ? 'Пауза' : 'Играть';
+      ui.toggle.setAttribute('aria-label', ui.toggle.title);
+    }
+    const v = station.volume ?? 0.5;
+    if (!ui.vol.matches(':active')) setRange(ui.vol, v);
+    ui.volText.textContent = `${Math.round(v * 100)} %`;
+    const off = v <= 0;
+    if (ui.volBtn.dataset.off !== String(off)) {
+      ui.volBtn.dataset.off = String(off);
+      ui.volBtn.innerHTML = off ? ui.VOL_OFF : ui.VOL_ON;
+      ui.volBtn.title = off ? 'Включить звук колонки' : 'Выключить звук колонки';
+      ui.volBtn.setAttribute('aria-label', ui.volBtn.title);
+    }
+  };
+  const stationRender = async () => {
+    if (!stationPop) return;
+    const pop = stationPop;
+    pop.textContent = '';
+    stationUi = null;
+    if (station) {
+      if (!station.ready) {
+        const head = document.createElement('div');
+        head.className = 'tune-station-head';
+        head.textContent = `Подключение: ${station.name}…`;
+        pop.appendChild(head);
+        pop.appendChild(stationRow('Отменить', '', stationStop));
+        return;
+      }
+      stationPanel(pop);
+      return;
+    }
+    pop.appendChild(stationNote('Ищем устройства…'));
+    let list;
+    try {
+      list = await T.invoke('page_station_list');
+    } catch (e) {
+      if (stationPop === pop) {
+        pop.textContent = '';
+        if (String(e) === 'NEED_LOGIN') stationLogin(pop);
+        else pop.appendChild(stationNote(String(e)));
+      }
+      return;
+    }
+    if (stationPop !== pop || station) return;
+    pop.textContent = '';
+    if (!list.length) pop.appendChild(stationNote('Станций и колонок не нашли. Они должны быть в одной сети с компьютером и в аккаунте, под которым вы вошли.'));
+    for (const d of list) {
+      if (d.foreign) {
+        const row = stationRow(d.name, 'В сети, но привязана к другому аккаунту Яндекса. Войдите аккаунтом, к которому она привязана.', () => {});
+        row.disabled = true;
+        pop.appendChild(row);
+        continue;
+      }
+      pop.appendChild(
+        stationRow(d.name, d.online ? 'В этой сети' : 'Не откликнулась в сети', async () => {
+          station = { id: d.id, name: d.name, ready: false, track: null, playing: false, pos: 0, at: 0, volume: null, retries: 0 };
+          stationRender();
+          stationConnect();
+        })
+      );
+    }
+    pop.appendChild(
+      stationRow('Войти другим аккаунтом', '', async () => {
+        await T.invoke('page_station_logout').catch(() => {});
+        stationRender();
+      })
+    );
+  };
+  window.addEventListener('tune:station', (e) => {
+    const ev = e.detail || {};
+    if (!station) return;
+    if (ev.state === 'connected') {
+      station.ready = true;
+      station.retries = 0;
+      station.track = null;
+      if (station.speed === undefined) station.speed = player.speed() || 1;
+      if (stationBtn) {
+        stationBtn.classList.add('tune-on');
+        stationBtn.title = `Играет на: ${station.name}`;
+      }
+      applyAudioFx();
+      player.play();
+      // Сразу после запуска плеер в простое: resume ему нечего продолжать, запускает только toggle.
+      setTimeout(() => station && station.ready && !player.isPlaying() && player.toggle(), 600);
+      stationHold(5000);
+      stationSync();
+      stationRender();
+    } else if (ev.state === 'status') {
+      if (typeof ev.volume === 'number' && performance.now() > (station.volumeUntil || 0)) station.volume = ev.volume;
+      if (station.ready) stationFollow(ev);
+      stationPaint();
+    } else if (ev.state === 'file') {
+      console.log('[tune] колонка, файл трека:', ev.via);
+      if (ev.via === 'none') T.toast('Колонка не смогла получить файл: разрешите Tune входящие подключения в брандмауэре Windows', { error: true });
+    } else if (ev.state === 'closed') {
+      if (ev.error && station.retries < 3) {
+        station.retries++;
+        station.ready = false;
+        stationRender();
+        setTimeout(() => station && stationConnect(), 3000);
+        return;
+      }
+      if (ev.error) T.toast(`${station.name}: ${ev.error}`, { error: true });
+      stationStop();
+    }
+  });
+  window.addEventListener('pagehide', () => station && T.invoke('page_station_disconnect').catch(() => {}));
+  const mountStation = () => {
+    if (!cfg.stations) {
+      if (station) stationStop();
+      stationClosePop();
+      stationBtn && stationBtn.remove();
+      stationBtn = null;
+      return;
+    }
+    if (stationBtn || !document.body) return;
+    stationBtn = document.createElement('button');
+    stationBtn.type = 'button';
+    stationBtn.id = 'tune-station-btn';
+    stationBtn.setAttribute('aria-label', 'Станции и колонки');
+    stationBtn.title = 'Станции и колонки';
+    stationBtn.innerHTML = STATION_ICON;
+    stationBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (stationPop) return stationClosePop();
+      stationPop = document.createElement('div');
+      stationPop.id = 'tune-station-pop';
+      stationPop.addEventListener('click', (ev) => ev.stopPropagation());
+      document.body.appendChild(stationPop);
+      stationRender();
+    });
+    document.body.appendChild(stationBtn);
+  };
+  document.addEventListener('click', stationClosePop);
+  // Страницу перезагрузили, а колонка осталась подключена — некому ею управлять.
+  T.invoke('page_station_disconnect').catch(() => {});
+
+  // ---------------------------------------------------------------------------
   // Скорость
   // ---------------------------------------------------------------------------
   const SPEED_MIN = 0.5;
@@ -2884,11 +3433,12 @@
     if (!p || p === guarded || typeof p.setSpeed !== 'function') return;
     const orig = p.setSpeed;
     p.setSpeed = function (v, ...rest) {
-      return orig.call(this, cfg.speedControl ? speed : v, ...rest);
+      return orig.call(this, station && station.ready ? 1 : cfg.speedControl ? speed : v, ...rest);
     };
     guarded = p;
   };
   const applySpeed = () => {
+    if (station && station.ready) return;
     if (!cfg.speedControl) {
       if (speedWasOn && Math.abs((player.speed() || 1) - 1) > 0.001) player.speed(1);
       speedWasOn = false;
@@ -2910,7 +3460,7 @@
     } catch (e) {}
     applySpeed();
     applyPitch();
-    T.toast(`Скорость ${fmtSpeed(speed)}`, { ms: 1200 });
+    T.toast(station && station.ready ? `Скорость ${fmtSpeed(speed)} — после отключения колонки` : `Скорость ${fmtSpeed(speed)}`, { ms: 1200 });
   };
   const speedStep = () => Number(cfg.speedStep) || 0.25;
   const stepSpeed = (dir, wrap = true) => {
@@ -2966,8 +3516,9 @@
     const mix = Math.min(100, Math.max(0, Number(cfg.reverb) || 0)) / 100;
     if (mix > 0 && !fx.conv.buffer) fx.conv.buffer = makeImpulse(fx.ctx);
     const t = fx.ctx.currentTime;
-    fx.wet.gain.setTargetAtTime(mix * 0.8, t, 0.05);
-    fx.dry.gain.setTargetAtTime(1 - mix * 0.4, t, 0.05);
+    const out = stationSilent() ? 0 : 1;
+    fx.wet.gain.setTargetAtTime(mix * 0.8 * out, t, 0.05);
+    fx.dry.gain.setTargetAtTime((1 - mix * 0.4) * out, t, 0.05);
   };
   const fxFor = (ctx) => {
     for (const fx of fxList) if (fx.ctx === ctx) return fx;
@@ -3015,6 +3566,11 @@
     if (typeof v === 'number') T.toast(`Громкость ${Math.round(v * 100)} %`, { ms: 900 });
   };
   const stepVolume = (dir, steps = 1) => {
+    if (station && station.ready) {
+      stationSetVolume((station.volume ?? 0.5) + (dir > 0 ? 0.1 : -0.1) * steps);
+      T.toast(`Колонка: ${Math.round(station.volume * 100)} %`, { ms: 900 });
+      return;
+    }
     const v = player.volume();
     if (typeof v !== 'number') return;
     const cur = Math.round(v * 100);
@@ -3863,6 +4419,7 @@
       prefetchNext();
     }
     mountPlayerButtons();
+    mountStation();
     applySpeed();
     if (cfg.uncensor) loadUncensor();
     mountUncensorBadges();

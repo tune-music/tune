@@ -106,6 +106,8 @@ pub struct Features {
     pub local_in_wave: bool,
     /// Помнить последний трек и очередь, если Ynison не отдал их при запуске.
     pub keep_track: bool,
+    /// Кнопка Станций и колонок Яндекса в локальной сети на верхней панели.
+    pub stations: bool,
 }
 
 impl Default for Features {
@@ -132,6 +134,7 @@ impl Default for Features {
             uncensor_wave: true,
             local_in_wave: true,
             keep_track: true,
+            stations: true,
         }
     }
 }

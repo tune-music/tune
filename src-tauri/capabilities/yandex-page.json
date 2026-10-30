@@ -24,6 +24,15 @@
     "allow-page-lyrics",
     "allow-page-spoof-save",
     "allow-page-spoof-remove",
+    "allow-page-station-list",
+    "allow-page-station-play-file",
+    "allow-page-station-login-start",
+    "allow-page-station-login-open",
+    "allow-page-station-login-poll",
+    "allow-page-station-logout",
+    "allow-page-station-connect",
+    "allow-page-station-disconnect",
+    "allow-page-station-send",
     "allow-install-update",
     "allow-skip-update"
   ]

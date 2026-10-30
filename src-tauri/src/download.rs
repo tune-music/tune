@@ -119,6 +119,22 @@ pub fn start(job: Job, dir: PathBuf, report: impl Fn(serde_json::Value) + Send +
     id
 }
 
+/// Файл трека целиком в памяти и уже расшифрованный — для колонки в локальной сети.
+pub fn fetch_bytes(url: &str, key: Option<&str>) -> Result<Vec<u8>, String> {
+    let mut cipher = Cipher::new(key)?;
+    let agent: ureq::Agent = ureq::Agent::config_builder().timeout_connect(Some(Duration::from_secs(20))).build().into();
+    let mut resp = agent
+        .get(url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) YandexMusic")
+        .header("Origin", crate::intercept::ORIGIN)
+        .header("Referer", "https://music.yandex.ru/")
+        .call()
+        .map_err(|e| format!("Не удалось получить файл трека: {e}"))?;
+    let mut bytes = resp.body_mut().with_config().limit(512 * 1024 * 1024).read_to_vec().map_err(|e| e.to_string())?;
+    cipher.apply(&mut bytes);
+    Ok(bytes)
+}
+
 fn fetch(job: &Job, dir: &Path, progress: impl Fn(u64, u64)) -> Result<PathBuf, String> {
     let mut cipher = Cipher::new(job.key.as_deref())?;
     let agent: ureq::Agent = ureq::Agent::config_builder()

@@ -10,10 +10,10 @@ mod intercept;
 mod lyrics;
 mod media;
 mod mixer;
-mod occlusion;
 mod proxy;
 mod repo;
 mod spoof;
+mod station;
 mod store;
 mod update;
 
@@ -368,9 +368,6 @@ fn create_main(app: &AppHandle, visible: bool) -> tauri::Result<()> {
         })
         .build()?;
     intercept::app_like(&win, debug_mode());
-    if let Ok(hwnd) = win.hwnd() {
-        occlusion::watch(app, hwnd.0 as isize);
-    }
     let zoom = state.settings().zoom;
     if (zoom - 1.0).abs() > 0.001 {
         let _ = win.set_zoom(zoom);
@@ -619,13 +616,8 @@ fn set_autostart(on: bool) -> Result<(), String> {
 
 #[tauri::command]
 fn page_ready(window: WebviewWindow, state: State<AppState>, loaded: Option<bool>) {
-    if window.label() == "main" {
-        occlusion::set_loaded(loaded == Some(true));
-    }
-    let hidden = window.label() == "main"
-        && (!window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false) || occlusion::hidden());
+    let hidden = window.label() == "main" && (!window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false));
     // Интерфейс Яндекса догрузился — окно в трее или свёрнуто, кадры больше не нужны.
-    // Закрытое другими окно спрячет occlusion сам.
     if loaded == Some(true) {
         if hidden {
             intercept::set_page_visible(&window, false);
@@ -700,6 +692,65 @@ async fn page_cookie(window: WebviewWindow, name: String) -> Option<String> {
         .into_iter()
         .find(|c| c.name() == name)
         .map(|c| c.value().to_string())
+}
+
+/// Станции и колонки аккаунта; ищем в сети пару секунд — не на главном потоке.
+#[tauri::command]
+async fn page_station_list(app: AppHandle) -> Result<Vec<station::Device>, String> {
+    let root = app.state::<AppState>().store.root().to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || station::list(&root)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn page_station_login_start() -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(station::login_start).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn page_station_login_open() {
+    if let Some(url) = station::login_url() {
+        open_external(&url);
+    }
+}
+
+#[tauri::command]
+async fn page_station_login_poll(app: AppHandle) -> Result<bool, String> {
+    let root = app.state::<AppState>().store.root().to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || station::login_poll(&root)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn page_station_logout(state: State<AppState>) {
+    station::logout(state.store.root());
+}
+
+#[tauri::command]
+fn page_station_connect(app: AppHandle, id: String, state: State<AppState>) -> Result<(), String> {
+    station::connect(state.store.root(), &id, move |ev| {
+        eval_client(&app, &format!("window.dispatchEvent(new CustomEvent('tune:station',{{detail:{ev}}}))"));
+    })
+}
+
+#[tauri::command]
+async fn page_station_play_file(app: AppHandle, id: String, url: String, key: Option<String>, codec: String, title: String, artist: String, cover: String, offset_ms: u64) -> Result<(), String> {
+    let track = station::FileTrack { id, url, key, codec, title, artist, cover, offset_ms };
+    tauri::async_runtime::spawn_blocking(move || {
+        station::play_file(track, |ev| {
+            eval_client(&app, &format!("window.dispatchEvent(new CustomEvent('tune:station',{{detail:{ev}}}))"));
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn page_station_disconnect() {
+    station::disconnect();
+}
+
+#[tauri::command]
+fn page_station_send(command: String, value: Option<serde_json::Value>) -> Result<(), String> {
+    station::send(&command, &value.unwrap_or_default())
 }
 
 /// Кнопка «Скачать» в плеере: файл текущего трека в «Загрузки».
@@ -1285,6 +1336,15 @@ fn main() {
             };
             let discord = discord::spawn();
             discord.configure(&settings.discord);
+            // Установщик обновления, заменяя прежнюю версию, удаляет её запись автозапуска —
+            // включённый автозапуск при каждом запуске записываем заново.
+            if settings.autostart {
+                std::thread::spawn(|| {
+                    if let Err(e) = set_autostart(true) {
+                        eprintln!("tune: автозапуск: {e}");
+                    }
+                });
+            }
             let media_keys = settings.media_keys;
             let hidden = std::env::args().any(|a| a == "--minimized") || settings.start_minimized;
             init_browser_args(settings.route_through_tune);
@@ -1323,6 +1383,15 @@ fn main() {
             page_lyrics,
             page_spoof_save,
             page_spoof_remove,
+            page_station_list,
+            page_station_play_file,
+            page_station_login_start,
+            page_station_login_open,
+            page_station_login_poll,
+            page_station_logout,
+            page_station_connect,
+            page_station_disconnect,
+            page_station_send,
             client_status,
             client_retry,
             list_addons,

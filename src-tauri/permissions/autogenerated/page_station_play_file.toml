@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-station-play-file"
+description = "Enables the page_station_play_file command without any pre-configured scope."
+commands.allow = ["page_station_play_file"]
+
+[[permission]]
+identifier = "deny-page-station-play-file"
+description = "Denies the page_station_play_file command without any pre-configured scope."
+commands.deny = ["page_station_play_file"]
