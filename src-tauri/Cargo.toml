@@ -1,6 +1,6 @@
 [package]
 name = "tune-music"
-version = "0.1.4"
+version = "0.1.5"
 description = "Tune — клиент Яндекс Музыки с темами и плагинами"
 edition = "2021"
 
