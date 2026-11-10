@@ -138,6 +138,25 @@
     .fan .bf2 { right: 0; top: 6%; animation-delay: -3s; }
     @keyframes float { 50% { transform: translateY(-8px); } }
 
+    /* ---------- Tune Native ---------- */
+    .announce { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 5px 14px 5px 5px; border-radius: 999px; border: 1px solid rgba(250,204,21,.35); background: rgba(250,204,21,.06); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; transition: border-color .15s, background .15s; }
+    .announce:hover { border-color: rgba(250,204,21,.7); background: rgba(250,204,21,.1); }
+    .announce b { padding: 2px 9px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .announce span { color: var(--text-3); }
+    #native { --glow: rgba(56,189,248,.16); }
+    #native .f-text .cta { margin-top: 28px; }
+    #native .f-text .kicker { color: var(--accent); font-size: 13px; margin: 0 0 10px; }
+    #native .f-text .meta { margin: 16px 0 0; color: var(--text-3); font-size: 14px; }
+    .bench { width: 100%; max-width: 440px; padding: 22px 24px; display: grid; gap: 18px; }
+    .bench h4 { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-3); letter-spacing: .04em; text-transform: uppercase; }
+    .bench-row { display: grid; grid-template-columns: 96px 1fr 92px; gap: 12px; align-items: center; font-size: 14px; font-weight: 700; }
+    .bench-row span { color: var(--text-2); font-weight: 600; }
+    .bench-row i { display: block; height: 10px; border-radius: 5px; background: rgba(255,255,255,.14); width: var(--w); }
+    .bench-row.fast i { background: linear-gradient(90deg, #38bdf8, #facc15); }
+    .bench-row em { font-style: normal; font-variant-numeric: tabular-nums; text-align: right; }
+    .bench-row.fast em { color: var(--accent); }
+    .bench small { color: var(--text-3); font-size: 12px; font-weight: 600; }
+
     /* ---------- Секции ---------- */
     section { padding: 96px 0; border-top: 1px solid var(--border); position: relative; }
     .kicker { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 10px; }
@@ -322,6 +341,7 @@
     <div class="wrap">
       <a class="brand" href="#"><img src="assets/icon.svg" alt="" />Tune Music</a>
       <nav>
+        <a href="#native">Tune Native</a>
         <a href="#themes">Темы</a>
         <a href="#features">Возможности</a>
         <a href="#install">Установка</a>
@@ -336,6 +356,7 @@
     <div class="hero">
       <div class="wrap">
         <div>
+          <a class="announce" href="#native"><b>Новое</b> Tune Native — быстрый клиент на Rust <span>→</span></a><br />
           <span class="eyebrow"><b>Windows 10 и 11</b> · бесплатно · открытый код</span>
           <h1>Яндекс Музыка, <em>какой она должна быть</em></h1>
           <p class="lead">Tune — отдельное приложение для Яндекс Музыки: темы и аддоны, синхронный текст, треки без цензуры, найткор, скачивание и статус в Discord. Официальный клиент ставить не нужно.</p>
@@ -357,6 +378,43 @@
         </div>
       </div>
     </div>
+
+    <section id="native">
+      <div class="wrap">
+        <div class="feature reveal">
+          <div class="f-text">
+            <p class="kicker">Новое · ранняя версия</p>
+            <h2>Tune Native: тот же Tune, только быстрый</h2>
+            <p>Новый клиент Яндекс Музыки, написанный с нуля на Rust. Интерфейс рисуется видеокартой, а не встроенным браузером, поэтому Tune Native запускается сразу, плавно листает длинные списки и почти не занимает памяти.</p>
+            <ul>
+              <li>Привычная Яндекс Музыка: главная, «Моя волна», коллекция, поиск, тексты, клипы и подкасты</li>
+              <li>Без цензуры, скачивание, найткор и статус в Discord — как в Tune</li>
+              <li>Тема Aquarium с живым фоном и Liquid Glass в разделе «Кастомизация»</li>
+              <li>Установщик без прав администратора, обновления приходят сами</li>
+            </ul>
+            <div class="cta">
+              <a class="btn btn-primary dl-native" href="https://github.com/tune-music/tune-native/releases/latest">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+                Скачать Tune Native
+              </a>
+              <a class="btn" href="https://github.com/tune-music/tune-native">Исходный код</a>
+            </div>
+            <p class="meta dl-native-meta">Windows 10 и 11 · ставится рядом с Tune и его не трогает</p>
+          </div>
+          <div class="stage">
+            <div class="ui bench">
+              <h4>Память</h4>
+              <div class="bench-row"><span>Tune</span><i style="--w: 100%"></i><em>487 МБ</em></div>
+              <div class="bench-row fast"><span>Tune Native</span><i style="--w: 33%"></i><em>140–175 МБ</em></div>
+              <h4>Процессы</h4>
+              <div class="bench-row"><span>Tune</span><i style="--w: 100%"></i><em>8</em></div>
+              <div class="bench-row fast"><span>Tune Native</span><i style="--w: 12.5%"></i><em>1</em></div>
+              <small>Windows 11, закрытая память процессов, без воспроизведения, обложки загружены</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section id="themes">
       <div class="wrap">
@@ -617,6 +675,18 @@
         if (portable) document.querySelectorAll('.dl-portable').forEach((a) => (a.href = portable.browser_download_url));
         const mb = setup ? ` · ${(setup.size / 1048576).toFixed(1).replace('.', ',')} МБ` : '';
         document.querySelectorAll('.dl-meta').forEach((m) => (m.textContent = `Версия ${String(rel.tag_name).replace(/^v/, '')}${mb}`));
+      })
+      .catch(() => {});
+
+    // Tune Native: прямая ссылка на установщик последнего выпуска.
+    fetch('https://api.github.com/repos/tune-music/tune-native/releases/latest')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((rel) => {
+        const setup = (rel.assets || []).find((a) => /setup\.exe$/i.test(a.name));
+        if (!setup) return;
+        document.querySelectorAll('.dl-native').forEach((a) => (a.href = setup.browser_download_url));
+        const mb = (setup.size / 1048576).toFixed(1).replace('.', ',');
+        document.querySelectorAll('.dl-native-meta').forEach((m) => (m.textContent = `Версия ${String(rel.tag_name).replace(/^v/, '')} · ${mb} МБ · Windows 10 и 11`));
       })
       .catch(() => {});
 
