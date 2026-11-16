@@ -988,7 +988,9 @@
   const apiAlbums = async (ids) => (ids.length ? (await apiFetch(`albums?albumIds=${ids.join(',')}`)) || [] : []);
   const uidOf = async () => {
     if (myUid) return myUid;
+    const auth = apiHeaders?.get('authorization');
     const s = await apiFetch('account/status');
+    if (auth !== apiHeaders?.get('authorization')) throw new Error('Аккаунт сменился во время запроса');
     myUid = String((s && s.account && s.account.uid) || '');
     return myUid;
   };
@@ -2251,17 +2253,26 @@
   // «Мне нравится»: лайк удалённого трека Яндекс сохраняет (он есть в collection/sync), но
   // из списка лайков и плейлиста «Мне нравится» такие треки прячет. Восстановленные — те,
   // у которых есть файл, — возвращаем по полному списку из collection/sync.
-  const LIKED_TTL = 10 * 60 * 1000;
+  const LIKED_TTL = 30 * 1000;
   let liked = { at: 0, list: [], loading: null };
   const likedAll = () => {
     if (Date.now() - liked.at < LIKED_TTL) return Promise.resolve(liked.list);
     if (liked.loading) return liked.loading;
     const loading = apiFetch('collection/sync', { method: 'POST', json: { likedTracks: { revision: 0 } } })
       .then((r) => {
-        const list = r && r.values && r.values.likedTracks && r.values.likedTracks.values && r.values.likedTracks.values.liked;
+        const rows = r?.values?.likedTracks?.values?.liked;
+        if (!Array.isArray(rows)) throw new Error('Яндекс не прислал полный список лайков');
+        const seen = new Set();
+        const list = rows.flatMap((row) => {
+          const id = String(row?.trackId ?? row?.id ?? '');
+          if (!id || seen.has(id)) return [];
+          seen.add(id);
+          return [{ ...row, trackId: id }];
+        });
         // Если лайки поменялись, пока шёл запрос, ответ в кэш не кладём.
-        if (liked.loading === loading) liked = { ...liked, at: Date.now(), list: Array.isArray(list) ? list : [], loading: null };
-        return Array.isArray(list) ? list : liked.list;
+        if (liked.loading !== loading) return liked.list;
+        liked = { at: Date.now(), list, loading: null };
+        return list;
       })
       .catch((e) => {
         console.warn('[tune] лайки из collection/sync', e);
@@ -2289,7 +2300,7 @@
     const have = new Set(list.map((t) => String(t && t.id)));
     const add = (await likedAll()).filter((l) => l && !have.has(String(l.trackId)) && ucFile(l.trackId));
     if (!add.length) return false;
-    const rich = lk && list.some((t) => t && t.track);
+    const rich = lk && (list.some((t) => t && t.track) || /[?&](?:rich-tracks|richTracks)=true(?:[&#]|$)/.test(reqUrl));
     const tracks = rich ? new Map((await apiTracks(add.map((l) => String(l.trackId)))).map((t) => [String(t.id), t])) : null;
     const time = (t) => Date.parse(t && t.timestamp) || 0;
     const indexed = list.some((t) => t && 'originalIndex' in t);
@@ -2323,15 +2334,15 @@
     // В превью только первые треки — спрятанные ищем по полному списку лайков.
     const [all, visible] = await Promise.all([likedAll(), uidOf().then((uid) => apiFetch(`users/${uid}/likes/tracks`))]);
     const seen = new Set(((visible && visible.library && visible.library.tracks) || []).map((t) => String(t && t.id)));
-    if (!seen.size) return false;
     const shown = new Map(data.tracks.map((t) => [String(t.id), t]));
     const hidden = all.filter((l) => l && !seen.has(String(l.trackId)) && !shown.has(String(l.trackId)) && ucFile(l.trackId));
     if (!hidden.length) return false;
     const hiddenIds = new Set(hidden.map((l) => String(l.trackId)));
     // Последний показанный трек — граница: восстановленные новее него встают в превью.
-    const last = all.findIndex((l) => l && String(l.trackId) === String(data.tracks[data.tracks.length - 1].id));
+    const lastID = data.tracks.at(-1)?.id;
+    const last = lastID == null ? -1 : all.findIndex((l) => l && String(l.trackId) === String(lastID));
     const order = (last < 0 ? all : all.slice(0, last + 1)).map((l) => String(l && l.trackId)).filter((id) => shown.has(id) || hiddenIds.has(id));
-    const want = order.slice(0, data.tracks.length);
+    const want = order.slice(0, data.tracks.length || 5);
     const missing = want.filter((id) => !shown.has(id));
     if (missing.length) for (const t of await apiTracks(missing)) if (t && t.id != null) shown.set(String(t.id), t);
     if (missing.length) data.tracks = want.map((id) => shown.get(id)).filter(Boolean);
@@ -2723,10 +2734,12 @@
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
     if (init && init.headers) new Headers(init.headers).forEach((v, k) => headers.set(k, v));
     if (api && headers.has('authorization')) {
+      if (apiHeaders?.get('authorization') !== headers.get('authorization')) {
+        myUid = '';
+        liked = { at: 0, list: [], loading: null };
+      }
       apiHeaders = headers;
       apiBase = url.match(API_HOST)[0];
-      const uid = url.match(/\/users\/(\d+)\//);
-      if (uid) myUid = uid[1];
       if (!healStarted) {
         healStarted = true;
         setTimeout(() => healNoAuto().catch((e) => console.warn('[tune] автоподмена удалённых треков', e)), 3000);
