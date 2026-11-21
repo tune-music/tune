@@ -183,16 +183,29 @@
     .v-card h3 { margin: 0 0 6px; font-size: 20px; line-height: 1.2; }
     .v-card p { margin: 0 0 14px; color: var(--text-2); font-size: 14px; line-height: 1.5; flex: 1; }
     .v-meta { font-size: 12px; color: var(--text-3); font-weight: 600; margin-bottom: 14px; min-height: 18px; }
-    .v-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .v-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .v-btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 13px;
-      border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 12px;
+      border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; white-space: nowrap;
       border: 1px solid var(--border-strong); background: var(--panel-2); color: var(--text); transition: background .15s, border-color .15s;
     }
     .v-btn:hover { background: #222226; }
-    .v-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); flex: 1; }
+    .v-btn.primary { grid-column: 1 / -1; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
     .v-btn.primary:hover { background: var(--accent-hover); }
+    .v-btn.span2 { grid-column: 1 / -1; }
     .v-btn svg { width: 15px; height: 15px; flex: none; }
+    .v-hint { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--text-3); text-decoration: none; transition: color .15s; }
+    .v-hint:hover { color: var(--accent); }
+    .copy-box {
+      display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 6px 6px 10px;
+      border-radius: 10px; border: 1px solid var(--border-strong); background: var(--panel-2);
+    }
+    .copy-box code { background: none; padding: 0; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    .copy-box button {
+      flex: none; padding: 6px 11px; border-radius: 7px; border: 0; background: var(--accent); color: var(--on-accent);
+      font-size: 12px; font-weight: 800; cursor: pointer; transition: background .15s;
+    }
+    .copy-box button:hover { background: var(--accent-hover); }
 
     /* ---------- Tune Native ---------- */
     #native { --glow: rgba(56,189,248,.16); }
@@ -520,7 +533,7 @@
             <div class="v-meta dl-native-meta">Релиз на GitHub</div>
             <div class="v-actions">
               <a class="v-btn primary dl-native" href="https://github.com/tune-music/tune-native/releases/latest">Скачать</a>
-              <a class="v-btn" href="https://github.com/tune-music/tune-native" aria-label="GitHub Tune Native">GitHub</a>
+              <a class="v-btn span2" href="https://github.com/tune-music/tune-native" aria-label="GitHub Tune Native">GitHub</a>
             </div>
           </article>
 
@@ -540,6 +553,7 @@
               <button class="v-btn copy-altstore" type="button" data-copy="https://github.com/tune-music/tune-ios/releases/latest/download/altstore.json">AltStore</button>
               <a class="v-btn" href="https://github.com/tune-music/tune-ios" aria-label="GitHub Tune iOS">GitHub</a>
             </div>
+            <a class="v-hint open-ios-install" href="#install">Как добавить в AltStore →</a>
           </article>
 
           <article class="v-card" data-platform="android">
@@ -555,7 +569,7 @@
             <div class="v-meta dl-android-meta">Релиз на GitHub</div>
             <div class="v-actions">
               <a class="v-btn primary dl-android" href="https://github.com/tune-music/tune-android/releases/latest">Скачать APK</a>
-              <a class="v-btn" href="https://github.com/tune-music/tune-android" aria-label="GitHub Tune Android">GitHub</a>
+              <a class="v-btn span2" href="https://github.com/tune-music/tune-android" aria-label="GitHub Tune Android">GitHub</a>
             </div>
           </article>
         </div>
@@ -813,9 +827,16 @@
 
         <div class="install-panel" data-panel="ios">
           <div class="steps">
-            <div class="step"><h3>Поставьте магазин</h3><p>Установите SideStore или AltStore на iPhone (для первой установки самого магазина понадобится компьютер).</p></div>
-            <div class="step"><h3>Добавьте источник</h3><p>Откройте Sources → «+» и вставьте ссылку на <code>altstore.json</code>, либо установите файл <a class="dl-ios" href="https://github.com/tune-music/tune-ios/releases/latest/download/Tune.ipa">Tune.ipa</a> вручную.</p></div>
-            <div class="step"><h3>Обновляйте в один клик</h3><p>Новые сборки появляются прямо в SideStore или AltStore — вход и скачанная музыка сохраняются.</p></div>
+            <div class="step"><h3>Поставьте AltStore или SideStore</h3><p>Установите SideStore или AltStore на iPhone (для первой установки самого магазина понадобится компьютер).</p></div>
+            <div class="step">
+              <h3>Добавьте источник</h3>
+              <p>В AltStore или SideStore откройте <b>Sources → «+»</b> (в правом верхнем углу), вставьте эту ссылку и подтвердите добавление:</p>
+              <div class="copy-box">
+                <code>https://github.com/tune-music/tune-ios/releases/latest/download/altstore.json</code>
+                <button class="copy-altstore" type="button" data-copy="https://github.com/tune-music/tune-ios/releases/latest/download/altstore.json">Копировать</button>
+              </div>
+            </div>
+            <div class="step"><h3>Установите и обновляйте</h3><p>Откройте добавленный источник «Tune» и нажмите <b>Get</b> (или установите <a class="dl-ios" href="https://github.com/tune-music/tune-ios/releases/latest/download/Tune.ipa">Tune.ipa</a> через My Apps → «+»). Обновления приходят в магазин, музыка и вход сохраняются.</p></div>
           </div>
         </div>
 
@@ -848,6 +869,10 @@
         <details>
           <summary>Где Tune хранит данные на Windows?</summary>
           <p>В папке <code>%APPDATA%\dev.tune.music</code>: аддоны, настройки, файлы подмены и скачанный интерфейс.</p>
+        </details>
+        <details>
+          <summary>Как добавить источник Tune в AltStore или SideStore на iOS?</summary>
+          <p>Скопируйте ссылку <code>https://github.com/tune-music/tune-ios/releases/latest/download/altstore.json</code>, откройте AltStore или SideStore на iPhone, перейдите на вкладку <b>Sources</b>, нажмите <b>«+»</b> в правом верхнем углу и вставьте ссылку. После добавления Tune появится в списке и будет обновляться одной кнопкой без потери скачанных треков.</p>
         </details>
         <details>
           <summary>Windows предупреждает о неизвестном издателе</summary>
@@ -970,12 +995,15 @@
     });
 
     // Вкладки установки.
+    const setInstallTab = (key) => {
+      document.querySelectorAll('.install-tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === key));
+      document.querySelectorAll('.install-panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === key));
+    };
     document.querySelectorAll('.install-tab').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        const key = tab.dataset.tab;
-        document.querySelectorAll('.install-tab').forEach((t) => t.classList.toggle('on', t === tab));
-        document.querySelectorAll('.install-panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === key));
-      });
+      tab.addEventListener('click', () => setInstallTab(tab.dataset.tab));
+    });
+    document.querySelectorAll('.open-ios-install').forEach((link) => {
+      link.addEventListener('click', () => setInstallTab('ios'));
     });
 
     // Эквалайзер на иллюстрации скорости + переключение скорости.
