@@ -3,6 +3,7 @@ name = "tune-music"
 version = "0.1.6"
 description = "Tune — клиент Яндекс Музыки с темами и плагинами"
 edition = "2021"
+license = "GPL-3.0-only"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
